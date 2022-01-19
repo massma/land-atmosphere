@@ -169,10 +169,12 @@ Between 0 and 24 hours.")
 (defvar mxlch-wsls "0.000" "Flow divergence factor for subsidence, in s^{-1}.")
 (defvar mxlch-lfixedlapserates ".false."
   "If true, the (enhancing) effect of subsidence on free tropospheric gradients is omitted.")
+(defvar mxlch-lfixedtroposphere ".false."
+  "UNDOCUMENTED in pdf.")
 (defvar mxlch-wthetasmax "0.0"
   "Maximum surface kinematic heat flux for standard flux profiles in K m s^{-1}.")
 (defvar mxlch-c_fluxes ".false."
-  "If true all fluxes are constant. It is better to use the options in NAMFLUX.")
+  "If true all fluxes are constant. It is better to use the options in NAMFLUX. (also note that this replace c_wth option in the NAMELIST.")
 (defvar mxlch-gamma "0.006"
   "Potential temperature lapse rate in the free troposphere in K m^{-1}.")
 (defvar mxlch-thetam0 "295.0"
@@ -182,7 +184,7 @@ Between 0 and 24 hours.")
 (defvar mxlch-advtheta "0.0"
   "Advection of potential temperature in K s^{-1}.")
 (defvar mxlch-pressure "1013.0"
-  "Air pressure in the boundary layer in Pa. TODO:default doesn't match units!")
+  "Air pressure in the boundary layer in hPa. TODO:fix pdf documentation with wrong units!")
 (defvar mxlch-wqsmax "0.00"
   "Maximum surface kinematic moisture flux for standard flux profiles, in g kg^{-1} m s^{-1}.")
 (defvar mxlch-gammaq "0.0"
@@ -205,7 +207,7 @@ Must be greater than or equal to  -`mxlch-qm0'.")
   "Initial tracer concentration part in ppb.
 
 Must be greater than or equal to -`mxlch-cm0'.")
-(defvar mxlch-c_ustr ".false."
+(defvar mxlch-c_ustr ".true."
   "If true the momentum fluxes (and friction velocity) are constant.")
 (defvar mxlch-z0 "0.03"
   "Roughness length in m.")
@@ -233,8 +235,12 @@ Must be greater than or equal to -`mxlch-cm0'.")
 
 ;; NAMSURFLAYER
 (defvar mxlch-lsurfacelayer ".false." "Enable or disable surface layer.")
-(defvar mxlch-z0m "0.03" "Roughness length of momentum in m.")
-(defvar mxlch-z0h "0.03" "Roughness lenth of heat in m.")
+(defvar mxlch-z0m "0.03" "Roughness length of momentum in m.
+
+Can get good defaults from the landsoil.cpp file in CLASS.")
+(defvar mxlch-z0h "0.03" "Roughness lenth of heat in m.
+
+Can get good defaults from the landsoil.cpp file in CLASS.")
 
 ;; NAMRAD
 (defvar mxlch-lradiation ".false." "Enable or disable
@@ -348,7 +354,7 @@ UNDOCUMENTED in pdf.")
 
 UNDOCUMENTED in pdf.")
 
-;; NAMCHEM
+;; NAMCHEM TODO: have not chekced that these defaults match those in bulk_chemsitry f90
 (defvar mxlch-lchem ".false." "Enable or disable chemistry.")
 (defvar mxlch-lcomplex ".false." "Choice between complex chemical scheme and simplified scheme.")
 (defvar mxlch-lwritepl ".true." "Enable the output of production and loss terms per chemical.")
@@ -422,37 +428,54 @@ does not have this (are these just comments in the namelist?).")
 ;; NAMSOA
 ;; all of beloe are undocumented
 (defvar mxlch-lvbs ".false."
-  "Undocumented (could look in fortran file to document, but I probably won't use these.")
+  "Undocumented. This defaults to .false. in fortran files. If it
+  is true, the namelist must define all other variables in
+  NAMSOA (there are no defaults).")
 (defvar mxlch-low_high_NOx "1"
-  "Undocumented (could look in fortran file to document, but I probably won't use these.")
+  "Undocumented in pdf, and no defaults in bulk_chemistry.f90, so
+  defauls are taken from namoptions.hyyt.")
 (defvar mxlch-alpha1_TERP_low "0.107"
-  "Undocumented (could look in fortran file to document, but I probably won't use these.")
+  "Undocumented in pdf, and no defaults in bulk_chemistry.f90, so
+  defauls are taken from namoptions.hyyt.")
 (defvar mxlch-alpha2_TERP_low "0.092"
-  "Undocumented (could look in fortran file to document, but I probably won't use these.")
+  "Undocumented in pdf, and no defaults in bulk_chemistry.f90, so
+  defauls are taken from namoptions.hyyt.")
 (defvar mxlch-alpha3_TERP_low "0.359"
-  "Undocumented (could look in fortran file to document, but I probably won't use these.")
+  "Undocumented in pdf, and no defaults in bulk_chemistry.f90, so
+  defauls are taken from namoptions.hyyt.")
 (defvar mxlch-alpha4_TERP_low "0.600"
-  "Undocumented (could look in fortran file to document, but I probably won't use these.")
+  "Undocumented in pdf, and no defaults in bulk_chemistry.f90, so
+  defauls are taken from namoptions.hyyt.")
 (defvar mxlch-alpha1_TERP_high "0.012"
-  "Undocumented (could look in fortran file to document, but I probably won't use these.")
+  "Undocumented in pdf, and no defaults in bulk_chemistry.f90, so
+  defauls are taken from namoptions.hyyt.")
 (defvar mxlch-alpha2_TERP_high "0.122"
-  "Undocumented (could look in fortran file to document, but I probably won't use these.")
+  "Undocumented in pdf, and no defaults in bulk_chemistry.f90, so
+  defauls are taken from namoptions.hyyt.")
 (defvar mxlch-alpha3_TERP_high "0.201"
-  "Undocumented (could look in fortran file to document, but I probably won't use these.")
+  "Undocumented in pdf, and no defaults in bulk_chemistry.f90, so
+  defauls are taken from namoptions.hyyt.")
 (defvar mxlch-alpha4_TERP_high "0.500"
-  "Undocumented (could look in fortran file to document, but I probably won't use these.")
+  "Undocumented in pdf, and no defaults in bulk_chemistry.f90, so
+  defauls are taken from namoptions.hyyt.")
 (defvar mxlch-alpha1_ISO_low "0.009"
-  "Undocumented (could look in fortran file to document, but I probably won't use these.")
+  "Undocumented in pdf, and no defaults in bulk_chemistry.f90, so
+  defauls are taken from namoptions.hyyt.")
 (defvar mxlch-alpha2_ISO_low "0.030"
-  "Undocumented (could look in fortran file to document, but I probably won't use these.")
+  "Undocumented in pdf, and no defaults in bulk_chemistry.f90, so
+  defauls are taken from namoptions.hyyt.")
 (defvar mxlch-alpha3_ISO_low "0.015"
-  "Undocumented (could look in fortran file to document, but I probably won't use these.")
+  "Undocumented in pdf, and no defaults in bulk_chemistry.f90, so
+  defauls are taken from namoptions.hyyt.")
 (defvar mxlch-alpha1_ISO_high "0.001"
-  "Undocumented (could look in fortran file to document, but I probably won't use these.")
+  "Undocumented in pdf, and no defaults in bulk_chemistry.f90, so
+  defauls are taken from namoptions.hyyt.")
 (defvar mxlch-alpha2_ISO_high "0.023"
-  "Undocumented (could look in fortran file to document, but I probably won't use these.")
+  "Undocumented in pdf, and no defaults in bulk_chemistry.f90, so
+  defauls are taken from namoptions.hyyt.")
 (defvar mxlch-alpha3_ISO_high "0.015"
-  "Undocumented (could look in fortran file to document, but I probably won't use these.")
+  "Undocumented in pdf, and no defaults in bulk_chemistry.f90, so
+  defauls are taken from namoptions.hyyt.")
 
 
 (provide 'mxlch)
