@@ -229,7 +229,7 @@ Must be greater than or equal to -`mxlch-cm0'.")
 (defvar mxlch-lscu ".false." "Enables shallow cumulus mass-flux parameterization.")
 (defvar mxlch-lrelaxdz ".false." "If true, LCL-z_i is nudged to calculated value by time-scale \tau, rather than being set to that value.")
 (defvar mxlch-tau "7200" "Time-scale for nudging transition layer depth in seconds.")
-(defvar mxlch-ladvecFT ".false." "TODO: where is doc??")
+(defvar mxlch-ladvecFT ".false." "If true advection is also applied for free troposphere.")
 
 ;; NAMSURFLAYER
 (defvar mxlch-lsurfacelayer ".false." "Enable or disable surface layer.")
@@ -237,9 +237,14 @@ Must be greater than or equal to -`mxlch-cm0'.")
 (defvar mxlch-z0h "0.03" "Roughness lenth of heat in m.")
 
 ;; NAMRAD
-(defvar mxlch-lradiation ".false." "Enable or disable radiation.")
+(defvar mxlch-lradiation ".false." "Enable or disable
+radiation. If this is turned off, net surface radiation is just a
+constant.")
 (defvar mxlch-cc "0" "Amount of cloud cover; unitless between 0 and 1.")
 (defvar mxlch-S0 "1368" "Incoming shortwave solar radiation in W m^{-2}.")
+(defvar mxlch-DeltaFsw "0.0" "Absorbed radiation by e.g. aerosols (neg. value) (shortwave component). [UNDOCUMENTED]")
+(defvar mxlch-DeltaFlw "0.0" "Emitted radiation by e.g. clouds (pos. value) (longwave compoonent). [UNDOCUMENTED]")
+(defvar mxlch-Rdistr "1.0" "Distribution of absorbing aerosols (see Barbero et al., 2013)")
 (defvar mxlch-albedo "0.2" "Albedo as a fraction between 0 and 1.")
 
 ;; NAMSURFACE
@@ -259,12 +264,21 @@ Note in MXLCH this defaults to `mxlch-thetam0', however in the
 (defvar mxlch-wsat "0.6" "Saturated volumetric water content ECMWF config (m^3 m^{-3}).")
 (defvar mxlch-CLa "0.083" "Clapp and Hornberger retention curve parameter a [unitless].")
 (defvar mxlch-CLb "11.4" "Clapp and Hornberger retention curve parameter b [unitless].")
-(defvar mxlch-CLc "12.0" "Clapp and Hornberger retention curve parameter c [unitless].")
-(defvar mxlch-C1sat "0.342" "Coefficient force term moisture")
-(defvar mxlch-C2ref "0.3" "Coefficient restore term moisture")
-(defvar mxlch-gD "0.0" "VPD correction factor for rs TODO:units?.")
-(defvar mxlch-rsmin "0.0" "Minimum resistance of transpiration (s m^{-1}).")
-(defvar mxlch-rssoilmin "0.0" "Minimum resistance of soiltranspiration [s m^{-1}].")
+(defvar mxlch-CLc "12.0" "Clapp and Hornberger retention curve
+parameter c [unitless] (this is parameter \"p\" in textbook, soo
+page 140).")
+(defvar mxlch-C1sat "0.342" "Coefficient force term moisture (for heat, see page 140 in textbook).")
+(defvar mxlch-C2ref "0.3" "Coefficient restore term moisture (for heat, see page 140 in textbook).")
+(defvar mxlch-gD "0.0" "VPD correction factor for rs TODO:units?. This is only used of lrsAgs is false. Also the formulation for rs doesn't make sense to me, something to check.")
+(defvar mxlch-rsmin "0.0" "Minimum resistance of transpiration (s m^{-1}).
+
+This is only used of lrsAgs is false. Also the formulation for rs
+doesn't make sense to me, something to check. Basically if rsmin
+is 0.0, then rs will be 0.0 independent of all the other factors
+and vpd, etc.")
+(defvar mxlch-rssoilmin "0.0" "Minimum resistance of soiltranspiration [s m^{-1}].
+
+It seems like this formulation is broken: if rssoilmin is 0.0, then it will always be 0.0 independent of the other factors. look up Jarvis-Steward stomatal conudctance model.")
 (defvar mxlch-LAI "1.0" "Leaf area index [m^2 m^{-2}].")
 (defvar mxlch-cveg "1.0" "Vegetation fraction")
 (defvar mxlch-Tsoil "285" "Temperature top soil layer [K].")
@@ -274,21 +288,51 @@ Note in MXLCH this defaults to `mxlch-thetam0', however in the
 (defvar mxlch-CGsat "3.6e-6" "Saturated soil conductivity for heat [K m^{2} J^{-1}].")
 (defvar mxlch-lrsAgs ".false." "Switch to use A-gs model for surface resistances")
 (defvar mxlch-lCO2Ags ".false" "Switch to use A-gs model for CO2 flux")
-(defvar mxlch-CO2comp298 "68.5" "CO2 compensation concentration [mg m-3]")
-(defvar mxlch-Q10CO2 "1.5" "function parameter to calculate CO2 compensation concentration [-]")
-(defvar mxlch-gm298 "7" "mesophyill conductance at 298 K [mm s-1]")
-(defvar mxlch-Ammax298 "2.2" "CO2 maximal primary productivity [mg m-2 s-1]")
-(defvar mxlch-Q10gm "2" "function parameter to calculate mesophyll conductance [-] ")
-(defvar mxlch-T1gm "278" "reference temperature to calculate mesophyll conductance gm [K]")
-(defvar mxlch-T2gm "301" "reference temperature to calculate mesophyll conductance gm [K]")
-(defvar mxlch-Q10Am "2" "function parameter to calculate maximal primary profuctivity Ammax")
-(defvar mxlch-T1Am "281" "reference temperature to calculate maximal primary profuctivity Ammax [K] ")
-(defvar mxlch-T2Am "311" "reference temperature to calculate maximal primary profuctivity Ammax [K]")
-(defvar mxlch-f0 "0.89" "maximum value Cfrac [-]")
-(defvar mxlch-ad "0.07" "regression coefficient to calculate Cfrac [kPa^{-1}]")
-(defvar mxlch-alpha0 "0.017" "initial low light conditions [mg J-1]")
-(defvar mxlch-Kx "0.7" "extinction coefficient PAR [-]")
-(defvar mxlch-gmin "2.5e-4" "cuticular (minimum) conductance [m s-1]")
+(defvar mxlch-CO2comp298 "68.5" "CO2 compensation concentration [mg m-3].
+
+Matches for c3 plants in the CLASS model (see model.cpp).")
+(defvar mxlch-Q10CO2 "1.5" "function parameter to calculate CO2 compensation concentration [-]
+
+Matches for c3 plants in the CLASS model (see model.cpp).")
+(defvar mxlch-gm298 "7" "mesophyill conductance at 298 K [mm s-1]
+
+Matches for c3 plants in the CLASS model (see model.cpp).")
+(defvar mxlch-Ammax298 "2.2" "CO2 maximal primary productivity [mg m-2 s-1]
+
+Matches for c3 plants in the CLASS model (see model.cpp).")
+(defvar mxlch-Q10gm "2" "function parameter to calculate mesophyll conductance [-]
+
+Matches for c3 plants in the CLASS model (see model.cpp).")
+(defvar mxlch-T1gm "278" "reference temperature to calculate mesophyll conductance gm [K]
+
+Matches for c3 plants in the CLASS model (see model.cpp).")
+(defvar mxlch-T2gm "301" "reference temperature to calculate mesophyll conductance gm [K]
+
+Matches for c3 plants in the CLASS model (see model.cpp).")
+(defvar mxlch-Q10Am "2" "function parameter to calculate maximal primary profuctivity Ammax
+
+Matches for c3 plants in the CLASS model (see model.cpp).")
+(defvar mxlch-T1Am "281" "reference temperature to calculate maximal primary profuctivity Ammax [K]
+
+Matches for c3 plants in the CLASS model (see model.cpp).")
+(defvar mxlch-T2Am "311" "reference temperature to calculate maximal primary profuctivity Ammax [K]
+
+Matches for c3 plants in the CLASS model (see model.cpp).")
+(defvar mxlch-f0 "0.89" "maximum value Cfrac [-]
+
+Matches for c3 plants in the CLASS model (see model.cpp).")
+(defvar mxlch-ad "0.07" "regression coefficient to calculate Cfrac [kPa^{-1}]
+
+Matches for c3 plants in the CLASS model (see model.cpp).")
+(defvar mxlch-alpha0 "0.017" "initial low light conditions [mg J-1]
+
+Matches for c3 plants in the CLASS model (see model.cpp).")
+(defvar mxlch-Kx "0.7" "extinction coefficient PAR [-]
+
+Matches for c3 plants in the CLASS model (see model.cpp).")
+(defvar mxlch-gmin "2.5e-4" "cuticular (minimum) conductance [m s-1]
+
+Matches for c3 plants in the CLASS model (see model.cpp).")
 (defvar mxlch-Cw "1.6e-3" "constant water stress correction (eq. 13 Jacobs et al. 2007) [-]")
 (defvar mxlch-wsmax "0.55" "upper reference value soil water [-]")
 (defvar mxlch-wsmin "0.005" "lower reference value soil water [-]")
@@ -334,7 +378,7 @@ troposphere [Pa]. TODO:default doesn't match units!")
 free troposphere. [g kg-1].")
 
 ;; NAMFLUX
-(defvar mxlch-offset_wt "0" "Offset for the kinematic hear flux [K m s-1].")
+(defvar mxlch-offset_wt "0" "Offset for the kinematic heat flux [K m s-1].")
 (defvar mxlch-offset_wq "0" "Offset for the kinematic moisture flux [g kg-1 m s-1].")
 (defvar mxlch-function_wt "2"
   "Shape of the kinematic heat flux.
@@ -377,7 +421,7 @@ does not have this (are these just comments in the namelist?).")
 
 ;; NAMSOA
 ;; all of beloe are undocumented
-(defvar mxlch-lvbs ".true."
+(defvar mxlch-lvbs ".false."
   "Undocumented (could look in fortran file to document, but I probably won't use these.")
 (defvar mxlch-low_high_NOx "1"
   "Undocumented (could look in fortran file to document, but I probably won't use these.")
@@ -409,7 +453,6 @@ does not have this (are these just comments in the namelist?).")
   "Undocumented (could look in fortran file to document, but I probably won't use these.")
 (defvar mxlch-alpha3_ISO_high "0.015"
   "Undocumented (could look in fortran file to document, but I probably won't use these.")
-
 
 
 (provide 'mxlch)
