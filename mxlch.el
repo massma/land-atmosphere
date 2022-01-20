@@ -174,15 +174,27 @@ Between 0 and 24 hours.")
 (defvar mxlch-wthetasmax "0.0"
   "Maximum surface kinematic heat flux for standard flux profiles in K m s^{-1}.")
 (defvar mxlch-c_fluxes ".false."
-  "If true all fluxes are constant. It is better to use the options in NAMFLUX. (also note that this replace c_wth option in the NAMELIST.")
+  "If true all fluxes are constant. It is better to use the options in NAMFLUX.
+
+(also note that this replace c_wth option in the NAMELIST.")
 (defvar mxlch-gamma "0.006"
   "Potential temperature lapse rate in the free troposphere in K m^{-1}.")
+(defvar mxlch-lgamma ".false."
+  "A switch to apply a different lapse rate (`mxlch-gamma2') to heights above some hcrit.
+
+TODO: undocumented in PDF; I could add.")
+(defvar mxlch-hcrit "10000"
+  "When `mxlch-lgamma' is true, apply `mxlch-gamma2' when zi > `mxlch-hcrit'.
+
+TODO: undocumented in PDF: I could add.")
+(defvar mxlch-gamma2 "0.006"
+  "When `mxlch-lgamma' is true, apply this lapse rate when zi > hcrit.
+
+TODO: undocumented in PDF: I could add.")
 (defvar mxlch-thetam0 "295.0"
   "Initial mixed layer potential temperature in K.")
 (defvar mxlch-dtheta0 "4"
   "Initital potential temperature jump in K.")
-(defvar mxlch-advtheta "0.0"
-  "Advection of potential temperature in K s^{-1}.")
 (defvar mxlch-pressure "1013.0"
   "Air pressure in the boundary layer in hPa. TODO:fix pdf documentation with wrong units!")
 (defvar mxlch-wqsmax "0.00"
@@ -195,8 +207,6 @@ Between 0 and 24 hours.")
   "Inititial specific humidity jump in g kg^{-1}.
 
 Must be greater than or equal to  -`mxlch-qm0'.")
-(defvar mxlch-advq "0.0"
-  "Advection of specific humidity. g kg^{-1} s^{-1}.")
 (defvar mxlch-wcsmax "0.0"
   "Maximum surface kinematic tracer flux for standard flub proiles in ppb m s^{-1}.")
 (defvar mxlch-gammac "0.0"
@@ -208,9 +218,18 @@ Must be greater than or equal to  -`mxlch-qm0'.")
 
 Must be greater than or equal to -`mxlch-cm0'.")
 (defvar mxlch-c_ustr ".true."
-  "If true the momentum fluxes (and friction velocity) are constant.")
+  "If true the momentum fluxes (and friction velocity) are constant.
+
+TODO: change in code to be lc_ustr to match coding convention on logical variables?
+
+This would make a backwards incompatable change to the namelist though, which
+might not be ideal.")
 (defvar mxlch-z0 "0.03"
-  "Roughness length in m.")
+  "Roughness length in m.
+
+TODO: Remove misleading comment in the fortran files falsly
+stating that z0 is \"initial boundary layer height\".")
+
 (defvar mxlch-uws0 "0"
   "Initital surface (x-)momentum flux in m^2 s^{-2}.")
 (defvar mxlch-vws0 "0"
@@ -227,11 +246,16 @@ Must be greater than or equal to -`mxlch-cm0'.")
   "Geostrophic wind in the x-direction in m s^{-1}.")
 (defvar mxlch-vg "0"
   "Geostrophic wind in the y-direction in m s^{-1}.")
+(defvar mxlch-advq "0.0"
+  "Advection of specific humidity. g kg^{-1} s^{-1}.")
+(defvar mxlch-advtheta "0.0"
+  "Advection of potential temperature in K s^{-1}.")
+(defvar mxlch-ladvecFT ".false." "If true advection is also applied for free troposphere.")
 (defvar mxlch-lencroachment ".false." "Enables encroachment")
 (defvar mxlch-lscu ".false." "Enables shallow cumulus mass-flux parameterization.")
 (defvar mxlch-lrelaxdz ".false." "If true, LCL-z_i is nudged to calculated value by time-scale \tau, rather than being set to that value.")
 (defvar mxlch-tau "7200" "Time-scale for nudging transition layer depth in seconds.")
-(defvar mxlch-ladvecFT ".false." "If true advection is also applied for free troposphere.")
+
 
 ;; NAMSURFLAYER
 (defvar mxlch-lsurfacelayer ".false." "Enable or disable surface layer.")
@@ -354,38 +378,71 @@ UNDOCUMENTED in pdf.")
 
 UNDOCUMENTED in pdf.")
 
-;; NAMCHEM TODO: have not chekced that these defaults match those in bulk_chemsitry f90
+;; NAMCHEM
 (defvar mxlch-lchem ".false." "Enable or disable chemistry.")
-(defvar mxlch-lcomplex ".false." "Choice between complex chemical scheme and simplified scheme.")
 (defvar mxlch-lwritepl ".true." "Enable the output of production and loss terms per chemical.")
+(defvar mxlch-lcomplex ".false." "Choice between complex chemical scheme and simplified scheme.")
 (defvar mxlch-ldiuvar ".true." "If false the UC radiation during day is calculated at time h.ref.")
 (defvar mxlch-h_ref "12." "Reference time for calculated UC radiation if ldiuvar is set to .false.")
 (defvar mxlch-lflux ".false." "If set to .true. the times of sunrise and sunset are input. The otpions in NAMFLUX are preferred.")
 (defvar mxlch-fluxstart "0.0" "Time of sunrise if lflux is set to .true. [hr].")
 (defvar mxlch-fluxend "0.0" "Time of sunset if lflux is set to .true. [hr].")
 (defvar mxlch-pressure_ft "1013.0"
-  "Defaults to pressure [Pa]. TODO:default doesn't match units!")
+  "Defaults to pressure [hPa] in fortran code.
+
+TODO: fix pdf documentation to match units")
 (defvar mxlch-lchconst ".false."
   "Switch to calculate reaction rates using reference
   temperatures, humidities, and pressures instead of actual
   values.")
 (defvar mxlch-t_ref_cbl "298."
   "Reference temperature in the boundary layer [K].")
-(defvar mxlch-p_ref_cbl "1000"
-  "Reference pressure in the boundary layer [Pa]. TODO:default doesn't match units!")
+(defvar mxlch-p_ref_cbl "1013.5"
+  "Reference pressure in the boundary layer [hPa].
+
+TODO: pdf reference has the wrong default (1000.0) and wrong units.!")
 (defvar mxlch-q_ref_cbl "10.0"
   "Reference specific humidity in the boundary layer [g kg-1].")
 (defvar mxlch-t_ref_ft "298."
   "Reference temeprature in the gree troposphere [K].")
-(defvar mxlch-p_ref_ft "1000." "Reference pressure in the free
-troposphere [Pa]. TODO:default doesn't match units!")
+(defvar mxlch-p_ref_ft "1013.5." "Reference pressure in the free
+troposphere [hPa].
+
+TODO: pdf reference has the wrong default (1000.0) and wrong units.!")
 (defvar mxlch-q_ref_ft "10.0"
   "Reference specific humidty in the
 free troposphere. [g kg-1].")
 
 ;; NAMFLUX
+(defvar mxlch-starttime_wt "sunrise"
+  "Time after which the heat flux starts in the case of functions 2 and 3 [s].")
+(defvar mxlch-endtime_wt "sunset"
+  "Time after which the heat flux ends in the case of functions 2 and 3 [s].")
 (defvar mxlch-offset_wt "0" "Offset for the kinematic heat flux [K m s-1].")
+
+(defvar mxlch-starttime_wq "sunrise"
+  "Time after which the moisture flux starts in the case of functions 2 and 3 [s].")
+(defvar mxlch-endtime_wq "sunset"
+  "Time after which the moisture flux ends in the case of functions 2 and 3 [s].")
 (defvar mxlch-offset_wq "0" "Offset for the kinematic moisture flux [g kg-1 m s-1].")
+
+(defvar mxlch-starttime_chem "sunrise"
+  "Time after which the chemical emissions start in the case of
+  functions 2 and 3. [s]")
+
+(defvar mxlch-endtime_chem "sunset"
+  "Time after which the chemical emissions end in the case of
+  functions 2 and 3. [s]")
+
+(defvar mxlch-starttime_adv "sunrise"
+  "Time after which the advection of potential temperature and moisture starts [s].
+
+Not sure about exclamation syntax, but the true variable name
+does not have this (are these just comments in the namelist?).")
+(defvar mxlch-endtime_adv "sunset"
+  "Time after which the advection of potential temperature and moisture ends [s].")
+
+
 (defvar mxlch-function_wt "2"
   "Shape of the kinematic heat flux.
 
@@ -401,32 +458,12 @@ free troposphere. [g kg-1].")
 at start and end and to `mxlch-wthetasmax' in the
 middle (Standard cosine is multiplied by -`mxlch-wthetasmax'/2
 and shifted by `mxlch-wthetasmax'/2).")
+
 (defvar mxlch-function_wq "2"
   "Shape of the kinematic moisture flux (see `mxlch-function_wt').")
-(defvar mxlch-starttime_wt "sunrise"
-  "Time after which the heat flux starts in the case of functions 2 and 3 [s].")
-(defvar mxlch-endtime_wt "sunset"
-  "Time after which the heat flux ends in the case of functions 2 and 3 [s].")
-(defvar mxlch-starttime_wq "sunrise"
-  "Time after which the moisture flux starts in the case of functions 2 and 3 [s].")
-(defvar mxlch-endtime_wq "sunset"
-  "Time after which the moisture flux ends in the case of functions 2 and 3 [s].")
-(defvar mxlch-starttime_adv "sunrise"
-  "Time after which the advection of potential temperature and moisture starts [s].
-
-Not sure about exclamation syntax, but the true variable name
-does not have this (are these just comments in the namelist?).")
-(defvar mxlch-endtime_adv "sunset"
-  "Time after which the advection of potential temperature and moisture ends [s].")
-(defvar mxlch-starttime_chem "sunrise"
-  "Time after which the chemical emissions start in the case of
-  functions 2 and 3. [s]")
-(defvar mxlch-endtime_chem "sunset"
-  "Time after which the chemical emissions end in the case of
-  functions 2 and 3. [s]")
 
 ;; NAMSOA
-;; all of beloe are undocumented
+;; all of below are undocumented, and have no defaults excelt lvbs.
 (defvar mxlch-lvbs ".false."
   "Undocumented. This defaults to .false. in fortran files. If it
   is true, the namelist must define all other variables in
@@ -477,6 +514,42 @@ does not have this (are these just comments in the namelist?).")
   "Undocumented in pdf, and no defaults in bulk_chemistry.f90, so
   defauls are taken from namoptions.hyyt.")
 
+
+(defun mxlch-set-non-default-constants ()
+  "Set all mxlch variables that deviate from the defaults, but are still held constant across experiments."
+  (setq mxlch-dtime "60")
+  ;; coordinates of northwoods in central park
+  (setq mxlch-latt "40.797327")
+  ;; (+ 360.0 -73.956050) 286.04395
+  (setq mxlch-long "286.04395")
+  ;; for now set hour to 0 rather than sunrse, to give initial
+  ;; conditions time to "spin up". note his is not a modifcation from
+  ;; default
+  (setq mxlch-hour "0.0")
+  (setq mxlch-lenhancedentrainment ".true.")
+  (setq mxlch-lradiation ".true.")
+  (setq mxlch-llandsurface ".true.")
+  (setq mxlch-lrsAgs ".true.")
+  (setq mxlch-lCO2Ags ".true.")
+  (setq mxlch-c_ustr ".false.")
+  (setq mxlch-lscu ".true.")
+
+  ;; we want to prescribe no fluxes
+  (setq mxlch-function_wt "0")
+  (setq mxlch-function_wq "0")
+
+  ;; below land parameters from broadleaf forest config in CLASS (see landsoil.cpp)
+  (setq mxlch-z0 "2.0")
+  (setq mxlch-z0m "2.0")
+  (setq mxlch-z0h "2.0")
+  (setq mxlch-albedo "0.25" )
+  (setq mxlch-LAI "5" )
+  (setq mxlch-Lambda "20.0" )
+
+  ;; should not be used if we use lrsAgs, but setting just in case
+  (setq mxlch-gD "0.03" )
+  (setq mxlch-rsmin "200.0")
+  'ok)
 
 (provide 'mxlch)
 ;;; mxlch.el ends here
