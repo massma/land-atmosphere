@@ -514,7 +514,8 @@ and shifted by `mxlch-wthetasmax'/2).")
   "Undocumented in pdf, and no defaults in bulk_chemistry.f90, so
   defauls are taken from namoptions.hyyt.")
 
-
+
+;;;; functions for setting up and running my experiments
 (defun mxlch-set-non-default-constants ()
   "Set all mxlch variables that deviate from the defaults, but are still held constant across experiments."
   (setq mxlch-dtime "60")
