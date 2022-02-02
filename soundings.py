@@ -2,87 +2,56 @@ import pickle
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
+import sys
+
+sys.path.append(os.environ['CLASS4GL'])
+
+from interface_multi import stations,stations_iterator, records_iterator,get_record_yaml,get_records
+
+path = os.environ['CLASS4GL_DATA'] + '/forcing/IGRA_PAIRS_20190515/'
+path_output = os.environ['CLASS4GL_DATA'] + '/experiments/IGRA_PAIRS_20190515/BASE/'
 
 
+# loading station information
+# second argument is which subset of statiosn to initialize with; e.g., 'ini' or 'morning'
+# all_stations.table has a table (dataframe) of all the statiosn int he dataset
+all_stations = stations(path, suffix='ini', refetch_stations=False)
 
-path = os.environ['CLASS4GL_DATA'] + "/forcing/IGRA_PAIRS_20190515"
-path_output = os.environ['CLASS4GL_DATA'] + "/experiments/IGRA_PAIRS_20190515/BASE"
+stations_iter = stations_iterator(all_stations)
+STNID,run_station = stations_iter.set_STNID(STNID=int(72518))
 
-file = open(path_output + "/72518_0_ini.pkl", "rb")
-df_ini = pd.read_pickle(file)
-file.close()
+# this is just a dataframe of all the stations we want to work on, we
+# could alternatiely load all stations with
+# pd.DataFrame(all_stations.table)
+all_stations_select = pd.DataFrame([run_station])
 
-file = open(path_output + "/72518_0_end.pkl", "rb")
-df_end = pd.read_pickle(file)
-file.close()
+# records morning is just a dataframe, which includes the indices of
+# each available sounding (index_start and index_end)
+# we could check and see if we can just get that index information from the _ini.pickle
+# file/dataframe
+records = get_records(all_stations_select,\
+                              path,\
+                              subset='ini',\
+                              refetch_records=False,\
+                              )
+records_station = records.query('STNID == ' + str(72518))
+path = "%s/%05d_%s.yaml" % (path, 72518, 'ini')
+f = open(path, 'r')
 
-print_stats(df_end)
-print_stats(df_ini)
-for c in df_ini.columns:
-    print(c)
+for (STNID,chunk,index),record in records_station.iterrows():
+    c4gli = get_record_yaml(f,
+                            record.index_start,
+                            record.index_end,
+                            mode='model_input')
 
-# largest file in database
-# even the largest files don't ahve any variation in dthetea, gamma theta, etc.
-# file= open(path + "/11520_diag.pkl", "rb")
-
-# albany
-file = open(path + "/72518_diag.pkl", "rb")
-# file = open(path + "/72518_ini.pkl", "rb")
-# file = open(path + "/72518_end.pkl", "rb")
-# new york city
-# file = open(path + "/72501_diag.pkl", "rb")
-df = pd.read_pickle(file)
-file.close()
-
-# we only want morning soundings, and those with realistic temperature for spring,summer,fall
-morning = df[(df.tstart < 12.0) & (df.theta > 240.0)]
-
-def print_stats(_df):
-    for i in _df.columns:
-        try:
-            mean = _df[i].mean()
-            std = _df[i].std()
-            if std > abs((0.01*mean)):
-                print("\n%s" % i)
-                print(mean)
-                print(std)
-            else:
-                print("\nNO VARIABILITY in: %s" % i)
-        except:
-            True
-
-print_stats(morning)
-
-# define spring as march april may;
-spring = morning[((morning.doy >= 60) & (morning.doy < 152))]
-
-# define summer as june july august
-summer = morning[((morning.doy >= 152) & (morning.doy < 244))]
-
-# define fall as sep oct nov
-fall = morning[((morning.doy >= 244) & (morning.doy < 335))]
-
-print(morning.advtheta.std())
-print(morning.gammatheta.std())
-
-# for _df,title in zip([spring, summer, fall], ["spring", "summer", "fall"]):
-#     # tc = _df.theta - 273.15
-#     for var in ['theta', 'q', 'h', 'u', 'v', 'cc' 'z0h', 'z0m']:
-#         plt.figure()
-#         _df[var].hist(bins=20)
-#         plt.title("%s %s" % (title, var))
-
-# plt.show()
+    # calculate averages in the troposphere; this code yanked from simulations/simulations.py
+    seltropo = (c4gli.air_ac.p > c4gli.air_ac.p.iloc[-1]+ 3000.*(- 1.2 * 9.81 ))
+    profile_tropo = c4gli.air_ac[seltropo]
+    for var in ['advt', 'advq', 'advu', 'advv']:
+        if var[:3] == 'adv':
+            mean_adv_tropo = np.mean(profile_tropo[var+'_x']+profile_tropo[var+'_y'] )
+            c4gli.update(source='era-interim',pars={var+'_tropo':mean_adv_tropo})
 
 
-######
-## do some stuff with albany
-
-# albany
-# file = open(path + "/72518_diag.pkl", "rb")
-# file = open(path + "/72518_ini.pkl", "rb")
-# file = open(path + "/72518_end.pkl", "rb")
-# albany = pd.read_pickle(file)
-# file.close()
-
-# print_stats(albany)
+f.close()
