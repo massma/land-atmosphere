@@ -4,17 +4,33 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
-path = os.environ['HOME'] + "/class/data/forcing/IGRA_PAIRS_20190515"
+
+path = os.environ['CLASS4GL_DATA'] + "/forcing/IGRA_PAIRS_20190515"
+path_output = os.environ['CLASS4GL_DATA'] + "/experiments/IGRA_PAIRS_20190515/BASE"
+
+file = open(path_output + "/72518_0_ini.pkl", "rb")
+df_ini = pd.read_pickle(file)
+file.close()
+
+file = open(path_output + "/72518_0_end.pkl", "rb")
+df_end = pd.read_pickle(file)
+file.close()
+
+print_stats(df_end)
+print_stats(df_ini)
+for c in df_ini.columns:
+    print(c)
+
 # largest file in database
 # even the largest files don't ahve any variation in dthetea, gamma theta, etc.
 # file= open(path + "/11520_diag.pkl", "rb")
 
 # albany
-# file = open(path + "/72518_diag.pkl", "rb")
+file = open(path + "/72518_diag.pkl", "rb")
 # file = open(path + "/72518_ini.pkl", "rb")
 # file = open(path + "/72518_end.pkl", "rb")
 # new york city
-file = open(path + "/72501_diag.pkl", "rb")
+# file = open(path + "/72501_diag.pkl", "rb")
 df = pd.read_pickle(file)
 file.close()
 
