@@ -5,6 +5,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sys
 import collections as c
+import seaborn as sns
+
+sns.set_theme()
 
 sys.path.append(os.environ['CLASS4GL'])
 
@@ -14,12 +17,33 @@ FORCING_PATH = os.environ['CLASS4GL_DATA'] + '/forcing/IGRA_PAIRS_20190515/'
 
 ALBANY_ID = 72518
 
-SPOKANE_ID = 72786
+
 MILANO_ID = 16080
-NORMAN_ID = 72357
+# spokane has 915 reocords
+SPOKANE_ID = 72786
+# near berlin 974 records
+LINDENBERG_ID = 10393
+# west germany near belguim/luxemborg 1014 records
+IDAR_OBERSTEIN_ID = 10618
+# slightly norther british columbia, prob similar to spokane
+KELOWNA_ID = 71203
+# northern germany
+BERGEN_ID = 10238
+# northern britich columbia
+PRINCE_GEORGE_ID = 71908
+# Iowa
+QUAD_CITY_ID = 74455
+# south dakota 472 records
 ABERDEEN_ID = 72659
+# oklahoma 441 reocrds
+NORMAN_ID = 72357
+# loisiana 383 records
 SHREVEPORT_ID = 72248
+# minetota 323 records
+CHANHASSEN_ID = 72649
+# califronia (315 records)
 EDWARDS_ID = 72381
+# illinois (237 records)
 LINCOLN_ID = 74560
 GAYLORD_ID = 72634
 PHOENIX_ID = 74626
@@ -29,7 +53,7 @@ BIRMINGHAM_ID = 72230
 PEACHTREE_ID = 72215
 PITTSBURGH_ID = 72520
 
-STATION_ID = PITTSBURGH_ID
+STATION_ID = SPOKANE_ID
 
 def generic_path(station_id, suffix='yaml'):
     """Generate a path given a STATION_ID and SUFFIX (e.g., yaml or pkl)."""
@@ -61,8 +85,47 @@ f = open(generic_path(STATION_ID, suffix='yaml'), 'r')
 records = c.deque()
 
 for (_station_id,_chunk,_index),record in df.iterrows():
-    records.append(load_record(f, record))
-
+    class_input = load_record(f, record)
+    records.append(class_input)
 f.close()
 
 print("\n****Length****:\n%10d" % len(records))
+
+def grab_record(key, records):
+    """Grab a list of objects from RECORDS corresponding to KEY"""
+    return [x.pars.__dict__[key] for x in records]
+
+# where are 'zi0', 'wsls', ug, ug
+# also confirm all equivalencies are right
+
+def pandas_dataframe(keys, records):
+    """Generate a pandas datafrae from KEYS in RECORDS"""
+    return pd.DataFrame(dict([(key, grab_record(key, records)) for key
+                              in keys]))
+
+input_keys = ['gammatheta', 'theta', 'dtheta',\
+              'advtheta', 'gammaq', 'q', 'dq', 'advq',
+              'gammau', 'gammav', 'u', 'v', 'cc',
+              'Tsoil', 'advt_tropo', 'advq_tropo',
+              'w2', 'wg']
+
+
+variability_keys = ['theta', 'q', 'u', 'v', 'cc',
+                    'Tsoil', 'advt_tropo', 'advq_tropo',
+                    'w2', 'wg']
+
+df_input = pandas_dataframe(variability_keys, records)
+
+corr = df_input.corr()
+
+for key in df_input.columns:
+    std_dev = df_input[key].std()
+    if std_dev > (abs(0.001 * df_input[key].mean())):
+        print("\n%s std: %15f" % (key, std_dev))
+    else:
+        print("no variability for %s" % key)
+
+
+for key in corr.columns:
+    print("\n*****%s*****" % key)
+    print(corr[key])
