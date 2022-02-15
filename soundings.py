@@ -156,11 +156,40 @@ for station_id in STATION_IDS.keys():
     data_frames[station_id] = data_frame
 
 
+# sets are a list of con cels, where the first location is a list of
+# station ids, and the second location is a list of keys that vary
+sets = c.deque()
 for station_id in STATION_IDS.keys():
-    if variability_keyss[station_id] == VARIABILITY_KEYS:
-        print("\n*****\n%s has the same variable variables as Spokane.\n" % station_id)
-    else:
-        print("\n*****\n%s VARIES FROM Spokane.\n" % station_id)
+    updated_set = False
+    variability_keys = variability_keyss[station_id]
+    for s in sets:
+        if variability_keys == s[1]:
+            s[0].append(station_id)
+            updated_set = True
+            break
+    if not updated_set:
+        sets.append([c.deque([station_id]), variability_keys])
+
+## TODO: check out set difference between milano/spkane and
+## lindenberg/norman; all ready to go just need to debug
+for s in sets:
+    print("******")
+    print(s[0])
+
+site_names_1 = c.deque(['milano', 'spokane', 'idar_oberstein',
+                        'kelowna', 'bergen', 'prince_george', 'quad_city', 'aberdeen',
+                        'phoenix', 'birmingham'])
+site_names_2 = c.deque(['lindenberg', 'norman', 'edwards'])
+
+site_set_1 = set()
+for s in sets:
+    if s[0] == site_names_1:
+        site_set_1 = set(s[1])
+    elif s[0] == site_names_2:
+        site_set_2 = set(s[1])
+
+print("variables in milano/spokane but not in norman/edwards: %s" % (site_set_1 - site_set_2))
+print("variables in norman/edwards but not in milano/spokane: %s" % (site_set_2 - site_set_1))
 
 # for key in corr.columns:
 #     print("\n*****%s*****" % key)
