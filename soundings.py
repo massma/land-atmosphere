@@ -141,55 +141,17 @@ non-floating data) from a dataframe DF_INPUT"""
             not_number_keys.append(key)
     return (variability_keys, constant_keys, not_number_keys)
 
+def load_dataframes():
+    """load all station dataframes in STATION_IDS into a dict keyed by the keys in STATION_IDS"""
+    data_frames = dict()
+    for station_id in STATION_IDS.keys():
+        data_frame = dataframe_from_records(load_records(station_id))
+        data_frames[station_id] = data_frame
+    return data_frames
+
 spokane = dataframe_from_records(load_records('spokane'))
 (VARIABILITY_KEYS, CONSTANT_KEYS, NOT_NUMBER_KEYS) =\
     generate_variability_keys(spokane)
-
-variability_keyss = dict()
-constant_keyss = dict()
-data_frames = dict()
-for station_id in STATION_IDS.keys():
-    data_frame = dataframe_from_records(load_records(station_id))
-    (var_keys, constant_keys, not_number_keys) = generate_variability_keys(data_frame)
-    variability_keyss[station_id] = var_keys
-    constant_keyss[station_id] = constant_keys
-    data_frames[station_id] = data_frame
-
-
-# sets are a list of con cels, where the first location is a list of
-# station ids, and the second location is a list of keys that vary
-sets = c.deque()
-for station_id in STATION_IDS.keys():
-    updated_set = False
-    variability_keys = variability_keyss[station_id]
-    for s in sets:
-        if variability_keys == s[1]:
-            s[0].append(station_id)
-            updated_set = True
-            break
-    if not updated_set:
-        sets.append([c.deque([station_id]), variability_keys])
-
-## TODO: check out set difference between milano/spkane and
-## lindenberg/norman; all ready to go just need to debug
-for s in sets:
-    print("******")
-    print(s[0])
-
-site_names_1 = c.deque(['milano', 'spokane', 'idar_oberstein',
-                        'kelowna', 'bergen', 'prince_george', 'quad_city', 'aberdeen',
-                        'phoenix', 'birmingham'])
-site_names_2 = c.deque(['lindenberg', 'norman', 'edwards'])
-
-site_set_1 = set()
-for s in sets:
-    if s[0] == site_names_1:
-        site_set_1 = set(s[1])
-    elif s[0] == site_names_2:
-        site_set_2 = set(s[1])
-
-print("variables in milano/spokane but not in norman/edwards: %s" % (site_set_1 - site_set_2))
-print("variables in norman/edwards but not in milano/spokane: %s" % (site_set_2 - site_set_1))
 
 # for key in corr.columns:
 #     print("\n*****%s*****" % key)
