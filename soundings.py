@@ -98,19 +98,16 @@ def grab_record(key, records):
 # where are 'zi0', 'wsls', ug, ug
 # also confirm all equivalencies are right
 
-def pandas_dataframe(keys, records):
+def dataframe_from_records(keys, records):
     """Generate a pandas datafrae from KEYS in RECORDS.
 
 If KEYS is false, then return a dataframe of every key in records."""
     if not keys:
         keys = records[0].pars.__dict__.keys()
-    return pd.DataFrame(dict([(key, grab_record(key, records)) for key
-                              in keys]))
-
-
-variability_keys = ['theta', 'q', 'u', 'v', 'cc',
-                    'Tsoil', 'advt_tropo', 'advq_tropo',
-                    'w2', 'wg']
+    df = pd.DataFrame(dict([(key, grab_record(key, records)) for key
+                            in keys]))
+    df.set_index('datetime', inplace=True, drop=False)
+    return df
 
 input_keys = ['gammatheta', 'theta', 'dtheta',\
               'advtheta', 'gammaq', 'q', 'dq', 'advq',
@@ -118,11 +115,6 @@ input_keys = ['gammatheta', 'theta', 'dtheta',\
               'Tsoil', 'advt_tropo', 'advq_tropo',
               'w2', 'wg']
 
-
-def dataframe_from_records(records):
-    """Generate a pandas dataframe from a sequence (RECORDS)"""
-    df_input = pandas_dataframe(False, records)
-    return df_input
 
 def generate_variability_keys(df_input):
     """Generate all keys that vary, don't vary, and are string (or other
@@ -145,18 +137,54 @@ def load_dataframes():
     """load all station dataframes in STATION_IDS into a dict keyed by the keys in STATION_IDS"""
     data_frames = dict()
     for station_id in STATION_IDS.keys():
-        data_frame = dataframe_from_records(load_records(station_id))
+        data_frame = dataframe_from_records(False, load_records(station_id))
         data_frames[station_id] = data_frame
     return data_frames
 
-spokane = dataframe_from_records(load_records('spokane'))
+def data_frame_size(_df):
+    """return the number of samples in a dataframe"""
+    return _df.shape[0]
+
+def monthly_counts(_df):
+    """return the monthly counts of sample in a dataframe"""
+    return _df.groupby(pd.Grouper(freq='M')).apply(data_frame_size)
+
+def max_monthly_counts(dfs):
+    """take the output of laod_dataframes, and calculate the max monthly sample sizes"""
+    monthly_counts_dict = dict()
+    for (station_id, _df) in dfs.items():
+        monthly_counts_dict[station_id] = monthly_counts(_df).max()
+    return monthly_counts_dict
+
+spokane = dataframe_from_records(False, load_records('spokane'))
+kelowna = dataframe_from_records(False, load_records('kelowna'))
+lincoln = dataframe_from_records(False, load_records('lincoln'))
+
 (VARIABILITY_KEYS, CONSTANT_KEYS, NOT_NUMBER_KEYS) =\
     generate_variability_keys(spokane)
+
+for (_name, _df) in zip(['spokane', 'kelowna', 'lincoln'], [spokane, kelowna, lincoln]):
+    print("\n*****%s" % _name)
+    mon_counts = monthly_counts(_df)
+    print(mon_counts.sort_values(ascending=False).head())
+
+
+for i in spokane.columns:
+    print(i)
 
 # for key in corr.columns:
 #     print("\n*****%s*****" % key)
 #     print(corr[key])
 
-# sns.displot(data=df_input, x='w2', y='cc')
-# sns.displot(data=df_input, x='wg', y='cc')
-# plt.show()
+sns.displot(data=spokane, x='w2', y='cc')
+plt.show()
+
+sns.lineplot(data=spokane, x='datetime', y='cc')
+plt.show()
+
+
+sns.displot(data=kelowna, x='w2', y='cc')
+plt.show()
+
+sns.lineplot(data=kelowna, x='datetime', y='cc')
+plt.show()
