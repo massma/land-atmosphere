@@ -156,32 +156,17 @@ def max_monthly_counts(dfs):
         monthly_counts_dict[station_id] = monthly_counts(_df).max()
     return monthly_counts_dict
 
-spokane = dataframe_from_records(False, load_records('spokane'))
 kelowna = dataframe_from_records(False, load_records('kelowna'))
-lincoln = dataframe_from_records(False, load_records('lincoln'))
 
 (VARIABILITY_KEYS, CONSTANT_KEYS, NOT_NUMBER_KEYS) =\
-    generate_variability_keys(spokane)
+    generate_variability_keys(kelowna)
 
-for (_name, _df) in zip(['spokane', 'kelowna', 'lincoln'], [spokane, kelowna, lincoln]):
-    print("\n*****%s" % _name)
-    mon_counts = monthly_counts(_df)
-    print(mon_counts.sort_values(ascending=False).head())
+mon_counts = monthly_counts(kelowna)
+print(mon_counts.sort_values(ascending=False).head())
 
 
-for i in spokane.columns:
+for i in VARIABILITY_KEYS:
     print(i)
-
-# for key in corr.columns:
-#     print("\n*****%s*****" % key)
-#     print(corr[key])
-
-sns.displot(data=spokane, x='w2', y='cc')
-plt.show()
-
-sns.lineplot(data=spokane, x='datetime', y='cc')
-plt.show()
-
 
 sns.displot(data=kelowna, x='w2', y='cc')
 plt.show()
