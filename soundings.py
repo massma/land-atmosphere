@@ -158,52 +158,157 @@ def max_monthly_counts(dfs):
 
 def write_station(station_id):
     """write a station's input data given a STATION_ID"""
-    df = dataframe_from_records(False, load_records('kelowna')
-    return
+    df = dataframe_from_records(False, load_records('kelowna'))
+    for (i, series) in kelowna.iterrows():
+        write_row(station_id, series)
+    return True
+
+def ppm_to_ppb(x):
+    """convert ppm to ppb"""
+    return x * 1000.0
+
+def pa_to_hpa(x):
+    """convert Pa to hPa"""
+    return x / 100.0
+
+def station_longitude(x):
+    """convert a -180-180 degree longitude to a 0-360 degree longitude"""
+    if x < 0.0:
+        x = 360 + x
+    return x
+
+elisp_conversion_functions = {
+    'CO2' : ppm_to_ppb,
+    'dCO2' : ppm_to_ppb,
+    'Ps' : pa_to_hpa,
+    'Station longitude' : station_longitude
+    }
+
+elisp_conversion = {
+    'mxlch-C1sat' : 'C1sat',
+    'mxlch-C2ref' : 'C2ref',
+    'mxlch-CGsat' : 'CGsat',
+    'mxlch-cm0' : 'CO2',
+    'mxlch-LAI' : 'LAI',
+    'mxlch-pressure' : 'Ps',
+    'mxlch-pressure_ft' : 'Ps',
+    'mxlch-latt' : 'Station latitude',
+    'mxlch-long' : 'Station longitude',
+    'mxlch-T2' : 'T2',
+    'mxlch-Ts' : 'Ts',
+    'mxlch-Tsoil' : 'Tsoil',
+    'mxlch-Wl' : 'Wl', # this doesn't vary and is set to default, we could remove
+    'mxlch-CLa' : 'a',
+    'mxlch-CLb' : 'b',
+    'mxlch-CLc' : 'p',
+    'mxlch-albedo' : 'alpha',
+    'mxlch-beta' : 'beta',
+    'mxlch-cc' : 'cc',
+    'mxlch-cveg' :'cveg',
+    'mxlch-dc0', 'dCO2',
+    'mxlch-DeltaFlw' : 'dFz',
+    'datetime',
+    'datetime_daylight',
+    'divU',
+    'doy',
+    'dq',
+    'dt',
+    'dtheta',
+    'du',
+    'dv',
+    'dz_h',
+    'fB',
+    'fH',
+    'fTC',
+    'fW',
+    'fc',
+    'gD',
+    'gammaCO2',
+    'gammaq',
+    'gammatheta',
+    'gammatheta_lower_limit',
+    'gammau',
+    'gammav',
+    'h',
+    'h_b',
+    'h_e',
+    'h_l',
+    'h_u',
+    'isoil',
+    'itex',
+    'lSunrise',
+    'lSunset',
+    'lat',
+    'latitude',
+    'ldatetime',
+    'ldatetime_daylight',
+    'lon',
+    'longitude',
+    'ls_type',
+    'p',
+    'q',
+    'rsmin',
+    'rssoilmin',
+    'runtime',
+    'sp',
+    'sw_ac',
+    'sw_ap',
+    'sw_cu',
+    'sw_fixft',
+    'sw_lit',
+    'sw_ls',
+    'sw_ml',
+    'sw_rad',
+    'sw_shearwe',
+    'sw_sl',
+    'sw_wind',
+    'tex_coarse_values',
+    'tex_fine_values',
+    'tex_medium_values',
+    'texture',
+    'theta',
+    'tstart',
+    'u',
+    'undefined_values',
+    'ustar',
+    'v',
+    'w2',
+    'wCO2',
+    'wfc',
+    'wg',
+    'wq',
+    'wsat',
+    'wtheta',
+    'wwilt',
+    'z0h',
+    'z0m',
+    'advt_tropo',
+    'advq_tropo',
+    'advu_tropo',
+    'advv_tropo',
+    }
+def write_row(station_id, series):
+    """write a row of input data given STATION_ID and SERIES"""
+    pwd = "data/%s_%d_%03d" % (station_id, series.STNID, series.doy)
+    os.makedirs(pwd)
+    f = open("%s/input.el" % pwd, 'w')
+    for key in elisp_conversion.keys():
+        write_variable(key, series, f)
+    f.close()
+    return True
+
+def write_variable(key, series, f):
+    """write a variable kiven a KEY to SERIES, and a filehandle F"""
+    f.write("(setq %s \"%s\")\n" % (elisp_conversion[key], series[key]))
+    return True
+
+
+
 
 kelowna = dataframe_from_records(False, load_records('kelowna'))
-lincoln = dataframe_from_records(False, load_records('lincoln'))
-spokane = dataframe_from_records(False, load_records('spokane'))
-milano = dataframe_from_records(False, load_records('milano'))
-lindenberg = dataframe_from_records(False, load_records('lindenberg'))
 
-(VARIABILITY_KEYS, CONSTANT_KEYS, NOT_NUMBER_KEYS) =\
-    generate_variability_keys(kelowna)
+for (i, series) in kelowna.iterrows():
+    print(series)
 
-corr = kelowna[VARIABILITY_KEYS].corr()
-
-mon_counts = monthly_counts(kelowna)
-print(mon_counts.sort_values(ascending=True).head(n=20))
-
-for i in VARIABILITY_KEYS:
-    print(i)
-
-sns.displot(data=kelowna, x='w2', y='cc')
-plt.show()
-
-sns.lineplot(data=kelowna, x='datetime', y='cc')
-plt.show()
-
-
-ax = sns.pointplot(data=kelowna, x='datetime', y='wg')
-ax.set_title("kelowna")
-plt.show()
-
-ax = sns.lineplot(data=lincoln, x='datetime', y='wg')
-ax.set_title("lincoln")
-plt.show()
-
-ax = sns.lineplot(data=spokane, x='datetime', y='wg')
-ax.set_title("spokane")
-plt.show()
-
-ax = sns.lineplot(data=milano, x='datetime', y='wg')
-ax.set_title("milano")
-plt.show()
-
-ax = sns.lineplot(data=lindenberg, x='datetime', y='wg')
-ax.set_title("lindenberg")
-plt.show()
-
-for i in kelowna.index:
+for i in kelowna:
     print(i)
