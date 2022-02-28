@@ -156,14 +156,24 @@ def max_monthly_counts(dfs):
         monthly_counts_dict[station_id] = monthly_counts(_df).max()
     return monthly_counts_dict
 
+def write_station(station_id):
+    """write a station's input data given a STATION_ID"""
+    df = dataframe_from_records(False, load_records('kelowna')
+    return
+
 kelowna = dataframe_from_records(False, load_records('kelowna'))
+lincoln = dataframe_from_records(False, load_records('lincoln'))
+spokane = dataframe_from_records(False, load_records('spokane'))
+milano = dataframe_from_records(False, load_records('milano'))
+lindenberg = dataframe_from_records(False, load_records('lindenberg'))
 
 (VARIABILITY_KEYS, CONSTANT_KEYS, NOT_NUMBER_KEYS) =\
     generate_variability_keys(kelowna)
 
-mon_counts = monthly_counts(kelowna)
-print(mon_counts.sort_values(ascending=False).head())
+corr = kelowna[VARIABILITY_KEYS].corr()
 
+mon_counts = monthly_counts(kelowna)
+print(mon_counts.sort_values(ascending=True).head(n=20))
 
 for i in VARIABILITY_KEYS:
     print(i)
@@ -173,3 +183,27 @@ plt.show()
 
 sns.lineplot(data=kelowna, x='datetime', y='cc')
 plt.show()
+
+
+ax = sns.pointplot(data=kelowna, x='datetime', y='wg')
+ax.set_title("kelowna")
+plt.show()
+
+ax = sns.lineplot(data=lincoln, x='datetime', y='wg')
+ax.set_title("lincoln")
+plt.show()
+
+ax = sns.lineplot(data=spokane, x='datetime', y='wg')
+ax.set_title("spokane")
+plt.show()
+
+ax = sns.lineplot(data=milano, x='datetime', y='wg')
+ax.set_title("milano")
+plt.show()
+
+ax = sns.lineplot(data=lindenberg, x='datetime', y='wg')
+ax.set_title("lindenberg")
+plt.show()
+
+for i in kelowna.index:
+    print(i)
