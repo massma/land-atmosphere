@@ -177,11 +177,42 @@ def station_longitude(x):
         x = 360 + x
     return x
 
+def kg_to_grams(x):
+    """convert kg to g"""
+    return x * 1000.0
+
+def ls_type_to_Ags_flag(x):
+    """convert a ls_type ('js' or 'Ags') to bools for use in 'mxlch-lrsAgs' and 'mxlch-lCO2Ags'"""
+    if x == 'Ags':
+        return True
+    elif x == 'js':
+        return False
+    else:
+        raise
+
+def fortran_print_bool(x):
+    if x:
+        return '.true.'
+    else:
+        return '.false.'
+
 elisp_conversion_functions = {
     'CO2' : ppm_to_ppb,
     'dCO2' : ppm_to_ppb,
+    'gammaCO2' : ppm_to_ppb,
+    'wCO2' : ppm_to_ppb,
     'Ps' : pa_to_hpa,
-    'Station longitude' : station_longitude
+    'lon' : station_longitude,
+    'gammaq' : kg_to_grams,
+    'q' : kg_to_grams,
+    'wq' : kg_to_grams,
+    'ls_type' : ls_type_to_Ags_flag,
+    'sw_fixft' : fortran_print_bool,
+    'sw_ls' : fortran_print_bool,
+    'sw_rad' : fortran_print_bool,
+    'sw_shearwe' : fortran_print_bool,
+    'sw_sl' : fortran_print_bool,
+    'sw_cu' : fortran_print_bool,
     }
 
 elisp_conversion = {
@@ -192,8 +223,6 @@ elisp_conversion = {
     'mxlch-LAI' : 'LAI',
     'mxlch-pressure' : 'Ps',
     'mxlch-pressure_ft' : 'Ps',
-    'mxlch-latt' : 'Station latitude',
-    'mxlch-long' : 'Station longitude',
     'mxlch-T2' : 'T2',
     'mxlch-Ts' : 'Ts',
     'mxlch-Tsoil' : 'Tsoil',
@@ -205,90 +234,66 @@ elisp_conversion = {
     'mxlch-beta' : 'beta',
     'mxlch-cc' : 'cc',
     'mxlch-cveg' :'cveg',
-    'mxlch-dc0', 'dCO2',
+    'mxlch-dc0': 'dCO2',
     'mxlch-DeltaFlw' : 'dFz',
-    'datetime',
-    'datetime_daylight',
-    'divU',
-    'doy',
-    'dq',
-    'dt',
-    'dtheta',
-    'du',
-    'dv',
-    'dz_h',
-    'fB',
-    'fH',
-    'fTC',
-    'fW',
-    'fc',
-    'gD',
-    'gammaCO2',
-    'gammaq',
-    'gammatheta',
-    'gammatheta_lower_limit',
-    'gammau',
-    'gammav',
-    'h',
-    'h_b',
-    'h_e',
-    'h_l',
-    'h_u',
-    'isoil',
-    'itex',
-    'lSunrise',
-    'lSunset',
-    'lat',
-    'latitude',
-    'ldatetime',
-    'ldatetime_daylight',
-    'lon',
-    'longitude',
-    'ls_type',
-    'p',
-    'q',
-    'rsmin',
-    'rssoilmin',
-    'runtime',
-    'sp',
-    'sw_ac',
-    'sw_ap',
-    'sw_cu',
-    'sw_fixft',
-    'sw_lit',
-    'sw_ls',
-    'sw_ml',
-    'sw_rad',
-    'sw_shearwe',
-    'sw_sl',
-    'sw_wind',
-    'tex_coarse_values',
-    'tex_fine_values',
-    'tex_medium_values',
-    'texture',
-    'theta',
-    'tstart',
-    'u',
-    'undefined_values',
-    'ustar',
-    'v',
-    'w2',
-    'wCO2',
-    'wfc',
-    'wg',
-    'wq',
-    'wsat',
-    'wtheta',
-    'wwilt',
-    'z0h',
-    'z0m',
-    'advt_tropo',
-    'advq_tropo',
-    'advu_tropo',
-    'advv_tropo',
+    'mxlch-day' : 'doy',
+    'mxlch-dq0' :'dq',
+    'mxlch-dtime' : 'dt',
+    'mxlch-dtheta0' : 'dtheta',
+    'mxlch-gD', : 'gD',
+    'mxlch-gammac' : 'gammaCO2',
+    'mxlch-gammaq' : 'gammaq',
+    'mxlch-gamma' : 'gammatheta',
+    'mxlch-gammau' : 'gammau',
+    'mxlch-gammav' : 'gammav',
+    'mxlch-zi0' : 'h',
+    'mxlch-latt' : 'lat',
+    'mxlch-long' : 'lon',
+    'mxlch-lrsAgs' : 'ls_type',
+    'mxlch-lCO2Ags' : 'ls_type',
+    'mxlch-qm0' : 'q',
+    'mxlch-rsmin' : 'rsmin',
+    'mxlch-rssoilmin' : 'rssoilmin',
+    'mxlch-time' : 'runtime',
+    'mxlch-lscu' : 'sw_cu',
+    'mxlch-lfixedtroposphere' : 'sw_fixft',
+    'mxlch-llandsurface' : 'sw_ls',
+    'mxlch-lradiation' : 'sw_rad',
+    'mxlch-lenhancedentrainment' : 'sw_shearwe',
+    'mxlch-lsurfacelayer' : 'sw_sl',
+    'mxlch-thetam0' : 'theta',
+    'mxlch-hour' : 'tstart',
+    'mxlch-um0' : 'u',
+    'mxlch-uv0' : 'v',
+    'mxlch-ug' : 'u',
+    'mxlch-vg' : 'v',
+    'mxlch-w2' : 'w2',
+    'mxlch-wcsmax' : 'wCO2', # same comment as wtheta; these are used slightly differently
+    'mxlch-wfc' : 'wfc',
+    'mxlch-wg' :'wg',
+    'mxlch-wqsmax' : 'wq', # same comment as wtheta; these are used
+                           # slightly differently; we may also want to
+                           # set these as offsets and use a constant
+                           # flux function??? we really need to
+                           # understand how 'wq' gets sued, and how
+                           # the offset functions get used. so onl
+    'mxlch-wsat' : 'wsat',
+    'mxlch-wthetasmax' : 'wtheta', # this might not be right
+    'mxlch-wwilt' : 'wwilt',
+    'mxlch-z0h' : 'z0h',
+    'mxlch-z0m' : 'z0m',
+    'mxlch-advtheta' : 'advt_tropo',
+    'mxlch-advq' : 'advq_tropo',
+    'mxlch-advu' : 'advu_tropo',
+    'mxlch-advv' : 'advv_tropo',
     }
+
 def write_row(station_id, series):
     """write a row of input data given STATION_ID and SERIES"""
+    # checks
+    if ((series.du != 0.0) or (series.dv != 0.0)):
+        raise RuntimeWarning("du/dv is not euqal to zero so we ahve to set geostrophic wind to
+somethign other than mixed layer wind")
     pwd = "data/%s_%d_%03d" % (station_id, series.STNID, series.doy)
     os.makedirs(pwd)
     f = open("%s/input.el" % pwd, 'w')
@@ -301,9 +306,6 @@ def write_variable(key, series, f):
     """write a variable kiven a KEY to SERIES, and a filehandle F"""
     f.write("(setq %s \"%s\")\n" % (elisp_conversion[key], series[key]))
     return True
-
-
-
 
 kelowna = dataframe_from_records(False, load_records('kelowna'))
 
