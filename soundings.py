@@ -304,7 +304,9 @@ somethign other than mixed layer wind")
 
 def write_variable(key, series, f):
     """write a variable kiven a KEY to SERIES, and a filehandle F"""
-    f.write("(setq %s \"%s\")\n" % (elisp_conversion[key], series[key]))
+    pandas_key = elisp_conversion[key]
+    f.write("(setq %s \"%s\")\n" % (key, elisp_conversion_functions[pandas_key](
+        series[pandas_key])))
     return True
 
 kelowna = dataframe_from_records(False, load_records('kelowna'))
