@@ -203,9 +203,11 @@ elisp_conversion_functions = {
     'wCO2' : ppm_to_ppb,
     'Ps' : pa_to_hpa,
     'lon' : station_longitude,
-    'gammaq' : kg_to_grams,
     'q' : kg_to_grams,
+    'dq' : kg_to_grams,
+    'gammaq' : kg_to_grams,
     'wq' : kg_to_grams,
+    'advq_tropo' : kg_to_grams,
     'ls_type' : ls_type_to_Ags_flag,
     'sw_fixft' : fortran_print_bool,
     'sw_ls' : fortran_print_bool,
@@ -284,8 +286,7 @@ elisp_conversion = {
     'mxlch-z0m' : 'z0m',
     'mxlch-advtheta' : 'advt_tropo',
     'mxlch-advq' : 'advq_tropo',
-    'mxlch-advu' : 'advu_tropo',
-    'mxlch-advv' : 'advv_tropo',
+
     }
 
 def write_row(station_id, series):
