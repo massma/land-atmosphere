@@ -150,7 +150,7 @@
 (defvar mxlch-time "86400" "Simulated time in seconds.")
 (defvar mxlch-dtime "1" "Timestep in seconds.")
 (defvar mxlch-atime "60" "Time interval for statistics in seconds.")
-(defvar mxlch-atime_vert "1800" "Time interval for vertical profile statistics in seconds.")
+(defvar mxlch-astime_vert "1800" "Time interval for vertical profile statistics in seconds.")
 (defvar mxlch-h_max "3000" "Maximum height of the simulated domain in meters.")
 (defvar mxlch-latt "0" "Latitude of simulated location in degrees.
 Should be between -90 and 90 degrees, inclusive.")
@@ -212,11 +212,23 @@ Must be greater than or equal to  -`mxlch-qm0'.")
 (defvar mxlch-gammac "0.0"
   "Tracer lapse rate in the free troposphere in ppb m^{-1}.")
 (defvar mxlch-cm0 "0.0"
-  "Initital mixed layer tracer concentration in ppb.")
+  "Initital mixed layer tracer concentration in ppb.
+\(confirmed, I think, in code that this is in fact ppb and NOT ppm)
+
+I think the model interprets this as carbon dioxide; see note in .f90:
+
+\"! cm0: initial carbon dioxide mixing layer value
+! dc0: initial carbon dioxide jump
+\"")
 (defvar mxlch-dc0 "0.0"
   "Initial tracer concentration part in ppb.
+\(confirmed, I think, in code that this is in fact ppb and NOT ppm)
 
-Must be greater than or equal to -`mxlch-cm0'.")
+Must be greater than or equal to -`mxlch-cm0'
+
+I think the model interprets this as carbon dioxide.
+
+See note in `mxlch-cm0' docs.")
 (defvar mxlch-c_ustr ".true."
   "If true the momentum fluxes (and friction velocity) are constant.
 
@@ -402,11 +414,17 @@ TODO: fix pdf documentation to match units")
 
 TODO: pdf reference has the wrong default (1000.0) and wrong units.!")
 (defvar mxlch-q_ref_cbl "10.0"
-  "Reference specific humidity in the boundary layer [g kg-1].")
+  "Reference specific humidity in the boundary layer [g kg-1].
+
+")
 (defvar mxlch-t_ref_ft "298."
-  "Reference temeprature in the gree troposphere [K].")
+  "Reference temeprature in the free troposphere [K].
+
+")
 (defvar mxlch-p_ref_ft "1013.5." "Reference pressure in the free
-troposphere [hPa].
+troposphere [hPa]
+
+I do not think tihs actually gets used, but I could be wrong..
 
 TODO: pdf reference has the wrong default (1000.0) and wrong units.!")
 (defvar mxlch-q_ref_ft "10.0"
@@ -535,7 +553,7 @@ and shifted by `mxlch-wthetasmax'/2).")
   (setq mxlch-c_ustr ".false.")
   (setq mxlch-lscu ".true.")
 
-  ;; we want to prescribe no fluxes
+  ;; do we want to prescribe no fluxes, or a constant prescribed flux set to *max?
   (setq mxlch-function_wt "0")
   (setq mxlch-function_wq "0")
 
