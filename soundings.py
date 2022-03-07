@@ -6,7 +6,7 @@ import numpy as np
 import sys
 import collections as c
 import seaborn as sns
-
+import random
 sns.set_theme()
 
 sys.path.append(os.environ['CLASS4GL'])
@@ -263,10 +263,10 @@ elisp_conversion = {
     'mxlch-uv0' : 'v',
     'mxlch-ug' : 'u',
     'mxlch-vg' : 'v',
-    'mxlch-w2' : 'w2',
+    'mxlch-w2' : 'w_average',
+    'mxlch-wg' :'w_average',
     'mxlch-wcsmax' : 'wCO2', # same comment as wtheta; these are used slightly differently
     'mxlch-wfc' : 'wfc',
-    'mxlch-wg' :'wg',
     'mxlch-wqsmax' : 'wq', # same comment as wtheta; these are used
                            # slightly differently; we may also want to
                            # set these as offsets and use a constant
@@ -290,10 +290,7 @@ def elisp_print_dispatcher(key, series):
         f = elisp_conversion_functions[pandas_key]
     except KeyError:
         f = lambda x: x
-    if (key == 'mxlch-wg') or (key == 'mxlch-w2'):
-        return 0.5 * (series.w2 + series.wg)
-    else:
-        return f(series[pandas_key])
+    return f(series[pandas_key])
 
 
 def write_variable(key, series, f):
@@ -302,16 +299,17 @@ def write_variable(key, series, f):
     f.write("(setq %s \"%s\")\n" % (key, elisp_print_dispatcher(key, series)))
     return True
 
-def write_row(prefix, series):
-    """write a row of input data given STATION_ID and SERIES.
+def write_row(prefix_f, series):
+    """write a row of input data given SERIES.
 
-PREFIX is a string that goes between `data' directory and the filename (e.g. data/%sfilename"""
+PREFIX_F is a function that takes SERIES as argument and returns a string of a filepath
+
+e.g., lamda x: '%d_%04d_%03d' % (series.STNID, series.datetime.year, series.doy)"""
     # checks
     if ((series.du != 0.0) or (series.dv != 0.0)):
         raise RuntimeWarning("du/dv is not euqal to zero so we ahve to set \
 geostrophic wind tosomethign other than mixed layer wind")
-    pwd = "data/%s%d_%04d_%03d" \
-% (prefix, series.STNID, series.datetime.year, series.doy)
+    pwd = 'data/%s'% (prefix_f(series))
     os.makedirs(pwd, exist_ok=True)
     f = open("%s/input.el" % pwd, 'w')
     for key in elisp_conversion.keys():
@@ -319,23 +317,52 @@ geostrophic wind tosomethign other than mixed layer wind")
     f.close()
     return True
 
-def write_experiment(prefix, df):
-    """write a station's input data given a STATION_ID and its dataframe DF"""
+def write_experiment(prefix_f, df):
+    """write a station's input data given a PREFIX_F (see `write_row') and its dataframe DF"""
     for (i, series) in df.iterrows():
-        write_row(prefix, series)
+        write_row(prefix_f, series)
     return True
 
 kelowna = dataframe_from_records(False, load_records('kelowna'))
 
-write_experiment('reality/kelowna_', kelowna)
+write_experiment(lambda df: 'reality/kelowna_%d_%04d_%03d' % (df.STNID, df.datetime.year, df.doy),
+                 kelowna)
+
+n = 10000
+
+
+def causal_experiment(n, df):
+    """generate a dataexperiment of a causal experiment N long, using DF to generate data
+
+Note that this assumes we are only interested in sampling soil mosture between
+(df.w_average.min() - df.w_average.std()) and df.w_average.max(), and it uses a
+uniform sampling
+"""
+    random.seed(a=1)
+    min_sm = df.w_average.min() - df.w_average.std()
+    max_sm = df.w_average.max()
+    index_range = range(n)
+    random_df = \
+       pd.DataFrame([df.iloc[random.randrange(df.shape[0])] for _i in index_range],
+                    index=index_range)
+    random_df['w_average'] = [random.uniform(min_sm, max_sm) for _i in index_range]
+    random_df['n'] = index_range
+    return random_df
+
+df_causal = causal_experiment(n, kelowna)
+
+write_experiment(lambda df: 'causal/kelowna_%d_%06d' % (df.STNID, df.n), df_causal)
+
+# TODO:
+# df_decorrelated = decorrelated_experiment(n, kelowna)
+
+# write_experiment(lambda df: 'decorrelated/kelowna_%d_%06d' % (df.STNID, df.n)
 
 # for (i, series) in kelowna.iterrows():
 #     print(series)
 
 # for i in kelowna:
 #     print(i)
-
-
 
 # for (i, series) in kelowna.iterrows():
 #     series['C1sat']
