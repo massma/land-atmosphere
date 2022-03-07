@@ -354,16 +354,22 @@ df_causal = causal_experiment(n, kelowna)
 write_experiment(lambda df: 'causal/kelowna_%d_%06d' % (df.STNID, df.n), df_causal)
 
 # TODO:
-# df_decorrelated = decorrelated_experiment(n, kelowna)
 
-# write_experiment(lambda df: 'decorrelated/kelowna_%d_%06d' % (df.STNID, df.n)
+def decorrelated_experiment(n, df):
+    """generate a dataexperiment of a decorrelated synoptic data N long,
+using DF to generate data
 
-# for (i, series) in kelowna.iterrows():
-#     print(series)
+    """
+    random.seed(a=1)
+    index_range = range(n)
+    random_df = pd.DataFrame(index=index_range)
+    for (label, datas) in df.iteritems():
+        random_df[label] = \
+            [datas.iloc[random.randrange(df.shape[0])] for _i in index_range]
+    random_df['n'] = index_range
+    return random_df
 
-# for i in kelowna:
-#     print(i)
+df_decorrelated = decorrelated_experiment(n, kelowna)
 
-# for (i, series) in kelowna.iterrows():
-#     series['C1sat']
-#      # write_row('kelowna', series)
+write_experiment(lambda df: 'decorrelated/kelowna_%d_%06d' % (df.STNID, df.n),
+                 df_decorrelated)
