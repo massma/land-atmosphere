@@ -107,6 +107,7 @@ If KEYS is false, then return a dataframe of every key in records."""
     df = pd.DataFrame(dict([(key, grab_record(key, records)) for key
                             in keys]))
     df.set_index('datetime', inplace=True, drop=False)
+    df['w_average'] = 0.5 * (df.w2 + df.wg)
     return df
 
 input_keys = ['gammatheta', 'theta', 'dtheta',\
@@ -156,13 +157,6 @@ def max_monthly_counts(dfs):
         monthly_counts_dict[station_id] = monthly_counts(_df).max()
     return monthly_counts_dict
 
-def write_station(station_id):
-    """write a station's input data given a STATION_ID"""
-    df = dataframe_from_records(False, load_records('kelowna'))
-    for (i, series) in kelowna.iterrows():
-        write_row(station_id, series)
-    return True
-
 def ppm_to_ppb(x):
     """convert ppm to ppb"""
     return x * 1000.0
@@ -184,9 +178,9 @@ def kg_to_grams(x):
 def ls_type_to_Ags_flag(x):
     """convert a ls_type ('js' or 'Ags') to bools for use in 'mxlch-lrsAgs' and 'mxlch-lCO2Ags'"""
     if x == 'Ags':
-        return True
+        return ".true."
     elif x == 'js':
-        return False
+        return ".false."
     else:
         raise
 
@@ -242,7 +236,7 @@ elisp_conversion = {
     'mxlch-dq0' :'dq',
     'mxlch-dtime' : 'dt',
     'mxlch-dtheta0' : 'dtheta',
-    'mxlch-gD', : 'gD',
+    'mxlch-gD' : 'gD',
     'mxlch-gammac' : 'gammaCO2',
     'mxlch-gammaq' : 'gammaq',
     'mxlch-gamma' : 'gammatheta',
@@ -289,31 +283,60 @@ elisp_conversion = {
 
     }
 
-def write_row(station_id, series):
-    """write a row of input data given STATION_ID and SERIES"""
+def elisp_print_dispatcher(key, series):
+    """Print the value corresponding to elisp variable KEY in class input pandas SERIES"""
+    pandas_key = elisp_conversion[key]
+    try:
+        f = elisp_conversion_functions[pandas_key]
+    except KeyError:
+        f = lambda x: x
+    if (key == 'mxlch-wg') or (key == 'mxlch-w2'):
+        return 0.5 * (series.w2 + series.wg)
+    else:
+        return f(series[pandas_key])
+
+
+def write_variable(key, series, f):
+    """write a variable kiven a KEY to SERIES, and a filehandle F"""
+
+    f.write("(setq %s \"%s\")\n" % (key, elisp_print_dispatcher(key, series)))
+    return True
+
+def write_row(prefix, series):
+    """write a row of input data given STATION_ID and SERIES.
+
+PREFIX is a string that goes between `data' directory and the filename (e.g. data/%sfilename"""
     # checks
     if ((series.du != 0.0) or (series.dv != 0.0)):
-        raise RuntimeWarning("du/dv is not euqal to zero so we ahve to set geostrophic wind to
-somethign other than mixed layer wind")
-    pwd = "data/%s_%d_%03d" % (station_id, series.STNID, series.doy)
-    os.makedirs(pwd)
+        raise RuntimeWarning("du/dv is not euqal to zero so we ahve to set \
+geostrophic wind tosomethign other than mixed layer wind")
+    pwd = "data/%s%d_%04d_%03d" \
+% (prefix, series.STNID, series.datetime.year, series.doy)
+    os.makedirs(pwd, exist_ok=True)
     f = open("%s/input.el" % pwd, 'w')
     for key in elisp_conversion.keys():
         write_variable(key, series, f)
     f.close()
     return True
 
-def write_variable(key, series, f):
-    """write a variable kiven a KEY to SERIES, and a filehandle F"""
-    pandas_key = elisp_conversion[key]
-    f.write("(setq %s \"%s\")\n" % (key, elisp_conversion_functions[pandas_key](
-        series[pandas_key])))
+def write_experiment(prefix, df):
+    """write a station's input data given a STATION_ID and its dataframe DF"""
+    for (i, series) in df.iterrows():
+        write_row(prefix, series)
     return True
 
 kelowna = dataframe_from_records(False, load_records('kelowna'))
 
-for (i, series) in kelowna.iterrows():
-    print(series)
+write_experiment('reality/kelowna_', kelowna)
 
-for i in kelowna:
-    print(i)
+# for (i, series) in kelowna.iterrows():
+#     print(series)
+
+# for i in kelowna:
+#     print(i)
+
+
+
+# for (i, series) in kelowna.iterrows():
+#     series['C1sat']
+#      # write_row('kelowna', series)
