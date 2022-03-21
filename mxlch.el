@@ -18,9 +18,15 @@
 
 
 ;;;; mxlch
+(defcustom mxlch-dir (concat (getenv "HOME") "/class/mxlch")
+  "The directory to find the MXLCH repository.  See https://github.com/classmodel/mxlch."
+  :type 'string
+  :group 'mxlch)
 
-(defvar mxlch-dir nil
-  "The director to find the MXLCH repository. See https://github.com/classmodel/mxlch.")
+(defcustom mxlch-data-dir (concat (getenv "HOME") "/land-atmosphere/data")
+  "The directory to find MXLCH data and simulations, as output by soundings.py."
+  :type 'string
+  :group 'mxlch)
 
 
 ;;;;  Utility functions
@@ -98,12 +104,13 @@
 
 "))
 
-(defun mxlch-write-namelist ()
+(defun mxlch-write-namelist (&optional filename)
   "Write the current state to a namelist in FILENAME."
-  (interactive)
-  (ido-file-internal ido-default-file-method)
   ;; we migth not want this to be interactive: instead call this from the design of my simulations
-  ;; (find-file filename)
+  (interactive)
+  (if filename
+      (find-file filename)
+    (ido-file-internal ido-default-file-method))
   (erase-buffer)
   (mxlch-write-block
    "RUN"
@@ -134,14 +141,122 @@
            t_ref_cbl p_ref_cbl q_ref_cbl t_ref_ft p_ref_ft q_ref_ft))
   (mxlch-write-block
    "FLUX"
-   '(offset_wt offset_wq function_wt function_wq starttime_wt endtime_wt starttime_wq
-               endtime_wq starttime_adv endtime_adv starttime_chem endtime_chem))
+   '(offset_wt offset_wq function_wt function_wq))
   (mxlch-write-block
    "SOA"
    '(lvbs low_high_NOx alpha1_TERP_low alpha2_TERP_low alpha3_TERP_low
           alpha4_TERP_low alpha1_TERP_high alpha2_TERP_high alpha3_TERP_high
           alpha4_TERP_high alpha1_ISO_low alpha2_ISO_low alpha3_ISO_low
-          alpha1_ISO_high alpha2_ISO_high alpha3_ISO_high)))
+          alpha1_ISO_high alpha2_ISO_high alpha3_ISO_high))
+  (save-buffer)
+  (kill-buffer))
+
+(defun mxlch-write-namelists ()
+  "Write all namelists for experiments in `mxlch-data-dir'."
+  (interactive)
+  (mxlch-set-non-default-constants)
+  (let ((inputs (directory-files-recursively mxlch-data-dir (rx  (*? anything) "input.el"))))
+    (dolist (input inputs)
+      (load input)
+      (mxlch-write-namelist (concat (file-name-directory input)
+                                    "namoptions")))
+    't))
+
+(defun mxlch-run-models ()
+  "Run all models for experiments in `mxlch-data-dir'.
+
+This could be asnychronous, but we end up with too many pipes open.
+
+Would have to use a more sophisticated handler using sentinels in that case."
+  (interactive)
+  (let ((inputs (directory-files-recursively mxlch-data-dir (rx  (*? anything) "input.el"))))
+    (dolist (input inputs)
+      (let ((default-directory  (file-name-directory input)))
+        (call-process "rm" nil nil nil "-rf" (concat default-directory "RUN00") "model-run.out")
+        (call-process
+         (concat mxlch-dir "/MXLCH")
+         nil
+         `(:file ,(concat default-directory "/model-run.out"))
+         nil
+         (concat mxlch-dir "/chem.inp.op3"))))
+    't))
+
+(defun mxlch-extract-et (dir)
+  "Extract et from output_land file in experiment DIR.
+
+Currently, this takes all data between 10 (inclusive) and 14 (exclusive)
+local time, and averages it.  If it encounters any NaN's, it will return 'NaN."
+  (find-file (concat dir "/RUN00/output_land"))
+  (goto-char (point-min))
+  (forward-line 3)
+  (move-beginning-of-line 1)
+  (let ((time)
+        (count 0)
+        (sum 0.0))
+    (while (and
+            (re-search-forward (rx (* blank) (group (+ (or num ?.))))
+                               (line-end-position)
+                               t)
+            (numberp sum))
+      (setq time (read (match-string 1)))
+      (when (and (>= time 10.0)
+                 (< time 14.0))
+        (dotimes (_x 8)
+          (re-search-forward (rx (* blank) (group (or "NaN" (+ (or num ?.)))))
+                              (line-end-position)
+                              t))
+        (let ((num (read (match-string 1))))
+          (if (eq 'NaN num)
+              (setq sum 'NaN)
+            (setq count (+ count 1))
+            (setq sum (+ sum num)))))
+      (move-beginning-of-line 2))
+    (kill-buffer)
+    (if (eq 'NaN sum)
+        'NaN
+      (/ sum (float count)))))
+
+(defun mxlch-test-extract-et ()
+  "Test the function `mxlch-extract-et'."
+  (if
+      (eq 'NaN
+          (mxlch-extract-et (file-name-directory
+                             "/home/adam/land-atmosphere/data/reality/kelowna_71203_2010_098/input.el")))
+      'ok
+    (error
+     "FAILED TO PASS test on /home/adam/land-atmosphere/data/reality/kelowna_71203_2010_098/input.el"))
+  (if (= 274.6017542083333
+          (mxlch-extract-et (file-name-directory
+                             "/home/adam/land-atmosphere/data/causal/kelowna_71203_000019/input.el")))
+      'ok
+    (error
+     "FAILED TO PASS TEST on /home/adam/land-atmosphere/data/causal/kelowna_71203_000019/input.el")))
+
+(defun mxlch-load-output (input)
+  "Load model output corresponding to input file INPUT.
+
+The returned data structure will be a list of length 3:
+(experiment name [string], soil moisture [string], ET [double]."
+  (load-file input)
+  (let* ((dir (file-name-directory input))
+         (et (mxlch-extract-et dir))
+         (experiment-name (file-name-base (directory-file-name dir))))))
+
+
+(defun mxlch-write-csv (dir)
+  "Write a csv from all experiments in DIR."
+  (let ((filename (concat (directory-file-name dir) ".csv"))
+        (inputs (directory-files-recursively dir (rx  (*? anything) "input.el"))))
+    (find-file filename)
+    (erase-buffer)
+    (insert "experiment,SM,ET
+")
+    (dolist (input inputs)
+      (let ((values (mxlch-load-output input)))
+        (insert (format "%s,%s,%e
+" (nth 0 values) (nth 1 values) (nth 2 values)))))))
+
+
 
 
 ;;;; Name options
@@ -150,7 +265,7 @@
 (defvar mxlch-time "86400" "Simulated time in seconds.")
 (defvar mxlch-dtime "1" "Timestep in seconds.")
 (defvar mxlch-atime "60" "Time interval for statistics in seconds.")
-(defvar mxlch-astime_vert "1800" "Time interval for vertical profile statistics in seconds.")
+(defvar mxlch-atime_vert "1800" "Time interval for vertical profile statistics in seconds.")
 (defvar mxlch-h_max "3000" "Maximum height of the simulated domain in meters.")
 (defvar mxlch-latt "0" "Latitude of simulated location in degrees.
 Should be between -90 and 90 degrees, inclusive.")
@@ -421,7 +536,7 @@ TODO: pdf reference has the wrong default (1000.0) and wrong units.!")
   "Reference temeprature in the free troposphere [K].
 
 ")
-(defvar mxlch-p_ref_ft "1013.5." "Reference pressure in the free
+(defvar mxlch-p_ref_ft "1013.5" "Reference pressure in the free
 troposphere [hPa]
 
 I do not think tihs actually gets used, but I could be wrong..
@@ -433,32 +548,56 @@ free troposphere. [g kg-1].")
 
 ;; NAMFLUX
 (defvar mxlch-starttime_wt "sunrise"
-  "Time after which the heat flux starts in the case of functions 2 and 3 [s].")
+  "Time after which the heat flux starts in the case of functions 2 and 3 [s].
+
+Note that currently this is not written to namelist, because the only way to trigger
+a sunrise startime is to not have this option in the namelist.")
 (defvar mxlch-endtime_wt "sunset"
-  "Time after which the heat flux ends in the case of functions 2 and 3 [s].")
+  "Time after which the heat flux ends in the case of functions 2 and 3 [s].
+
+Note that currently this is not written to namelist, because the only way to trigger
+a sunrise startime is to not have this option in the namelist.")
 (defvar mxlch-offset_wt "0" "Offset for the kinematic heat flux [K m s-1].")
 
 (defvar mxlch-starttime_wq "sunrise"
-  "Time after which the moisture flux starts in the case of functions 2 and 3 [s].")
+  "Time after which the moisture flux starts in the case of functions 2 and 3 [s].
+
+Note that currently this is not written to namelist, because the only way to trigger
+a sunrise startime is to not have this option in the namelist.")
 (defvar mxlch-endtime_wq "sunset"
-  "Time after which the moisture flux ends in the case of functions 2 and 3 [s].")
+  "Time after which the moisture flux ends in the case of functions 2 and 3 [s].
+
+Note that currently this is not written to namelist, because the only way to trigger
+a sunrise startime is to not have this option in the namelist.")
 (defvar mxlch-offset_wq "0" "Offset for the kinematic moisture flux [g kg-1 m s-1].")
 
 (defvar mxlch-starttime_chem "sunrise"
   "Time after which the chemical emissions start in the case of
-  functions 2 and 3. [s]")
+  functions 2 and 3. [s]
+
+Note that currently this is not written to namelist, because the only way to trigger
+a sunrise startime is to not have this option in the namelist.")
 
 (defvar mxlch-endtime_chem "sunset"
   "Time after which the chemical emissions end in the case of
-  functions 2 and 3. [s]")
+  functions 2 and 3. [s]
+
+Note that currently this is not written to namelist, because the only way to trigger
+a sunrise startime is to not have this option in the namelist.")
 
 (defvar mxlch-starttime_adv "sunrise"
   "Time after which the advection of potential temperature and moisture starts [s].
 
 Not sure about exclamation syntax, but the true variable name
-does not have this (are these just comments in the namelist?).")
+does not have this (are these just comments in the namelist?).
+
+Note that currently this is not written to namelist, because the only way to trigger
+a sunrise startime is to not have this option in the namelist.")
 (defvar mxlch-endtime_adv "sunset"
-  "Time after which the advection of potential temperature and moisture ends [s].")
+  "Time after which the advection of potential temperature and moisture ends [s].
+
+Note that currently this is not written to namelist, because the only way to trigger
+a sunrise startime is to not have this option in the namelist.")
 
 
 (defvar mxlch-function_wt "2"
@@ -534,8 +673,8 @@ and shifted by `mxlch-wthetasmax'/2).")
 
 
 ;;;; functions for setting up and running my experiments
-(defun mxlch-set-non-default-constants ()
-  "Set all mxlch variables that deviate from the defaults, but are still held constant across experiments."
+(defun mxlch-set-northwoods-non-default-constants ()
+  "Set all mxlch variables that deviate from the defaults, for the northwoods in central park."
   (setq mxlch-dtime "60")
   ;; coordinates of northwoods in central park
   (setq mxlch-latt "40.797327")
@@ -568,7 +707,17 @@ and shifted by `mxlch-wthetasmax'/2).")
   ;; should not be used if we use lrsAgs, but setting just in case
   (setq mxlch-gD "0.03" )
   (setq mxlch-rsmin "200.0")
-  'ok)
+  't)
+
+(defun mxlch-set-non-default-constants ()
+  "Set all mxlch variables that deviate from the defaults, but are still held constant across experiments."
+  ;; do we want to prescribe no fluxes, or a constant prescribed flux set to *max?
+  (setq mxlch-function_wt "0")
+  (setq mxlch-function_wq "0")
+  't)
+
+
+
 
 (provide 'mxlch)
 ;;; mxlch.el ends here
