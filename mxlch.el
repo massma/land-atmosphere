@@ -220,17 +220,25 @@ local time, and averages it.  If it encounters any NaN's, it will return 'NaN."
   "Test the function `mxlch-extract-et'."
   (if
       (eq 'NaN
-          (mxlch-extract-et (file-name-directory
-                             "/home/adam/land-atmosphere/data/reality/kelowna_71203_2010_098/input.el")))
+          (mxlch-extract-et
+           (file-name-directory
+            "/home/adam/land-atmosphere/data/reality/kelowna_71203_2010_098/input.el")))
       'ok
     (error
-     "FAILED TO PASS test on /home/adam/land-atmosphere/data/reality/kelowna_71203_2010_098/input.el"))
+     "FAILED TO PASS TEST ON:
+ /home/adam/land-atmosphere/data/reality/kelowna_71203_2010_098/input.el"))
   (if (= 274.6017542083333
-          (mxlch-extract-et (file-name-directory
-                             "/home/adam/land-atmosphere/data/causal/kelowna_71203_000019/input.el")))
+         (mxlch-extract-et
+          (file-name-directory
+           "/home/adam/land-atmosphere/data/causal/kelowna_71203_000019/input.el")))
       'ok
     (error
-     "FAILED TO PASS TEST on /home/adam/land-atmosphere/data/causal/kelowna_71203_000019/input.el")))
+     "FAILED TO PASS TEST ON:
+/home/adam/land-atmosphere/data/causal/kelowna_71203_000019/input.el")))
+
+(defun mxlch-run-tests ()
+  "Run every test in the mxlch package."
+  (mxlch-test-extract-et))
 
 (defun mxlch-load-output (input)
   "Load model output corresponding to input file INPUT.
