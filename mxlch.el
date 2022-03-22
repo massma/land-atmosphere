@@ -185,7 +185,10 @@ Would have to use a more sophisticated handler using sentinels in that case."
   "Extract et from output_land file in experiment DIR.
 
 Currently, this takes all data between 10 (inclusive) and 14 (exclusive)
-local time, and averages it.  If it encounters any NaN's, it will return 'NaN."
+local time, and averages it.
+
+It returns ET as a string, and if it encounters any NaN's,
+it will return \"NaN\"."
   (find-file (concat dir "/RUN00/output_land"))
   (goto-char (point-min))
   (forward-line 3)
@@ -212,14 +215,15 @@ local time, and averages it.  If it encounters any NaN's, it will return 'NaN."
             (setq sum (+ sum num)))))
       (move-beginning-of-line 2))
     (kill-buffer)
-    (if (eq 'NaN sum)
-        'NaN
-      (/ sum (float count)))))
+    (cond
+     ((eq 'NaN sum) "nan")
+     ((= 0 count) "nan")
+     (t (number-to-string (/ sum (float count)))))))
 
 (defun mxlch-test-extract-et ()
   "Test the function `mxlch-extract-et'."
   (if
-      (eq 'NaN
+      (string= "nan"
           (mxlch-extract-et
            (file-name-directory
             "/home/adam/land-atmosphere/data/reality/kelowna_71203_2010_098/input.el")))
@@ -227,7 +231,7 @@ local time, and averages it.  If it encounters any NaN's, it will return 'NaN."
     (error
      "FAILED TO PASS TEST ON:
  /home/adam/land-atmosphere/data/reality/kelowna_71203_2010_098/input.el"))
-  (if (= 274.6017542083333
+  (if (string= "274.6017542083333"
          (mxlch-extract-et
           (file-name-directory
            "/home/adam/land-atmosphere/data/causal/kelowna_71203_000019/input.el")))
@@ -244,11 +248,12 @@ local time, and averages it.  If it encounters any NaN's, it will return 'NaN."
   "Load model output corresponding to input file INPUT.
 
 The returned data structure will be a list of length 3:
-(experiment name [string], soil moisture [string], ET [double]."
+(experiment name [string], soil moisture [string], ET [string]."
   (load-file input)
   (let* ((dir (file-name-directory input))
          (et (mxlch-extract-et dir))
-         (experiment-name (file-name-base (directory-file-name dir))))))
+         (experiment-name (file-name-base (directory-file-name dir))))
+    (list experiment-name mxlch-wg et)))
 
 
 (defun mxlch-write-csv (dir)
@@ -261,9 +266,20 @@ The returned data structure will be a list of length 3:
 ")
     (dolist (input inputs)
       (let ((values (mxlch-load-output input)))
-        (insert (format "%s,%s,%e
-" (nth 0 values) (nth 1 values) (nth 2 values)))))))
+        (insert (format "%s,%s,%s
+" (nth 0 values) (nth 1 values) (nth 2 values)))))
+    (save-buffer)
+    (kill-buffer)))
 
+(defun mxlch-write-all-csvs ()
+  "Write all model output csvs.
+
+Call `mxlch-write-csv' on every directory in `mxlch-data-dir'."
+  (interactive)
+  (let ((exp-dirs (directory-files mxlch-data-dir t (rx (not ?.) (*? anything)))))
+    (dolist (dir exp-dirs)
+      (when (file-directory-p dir)
+          (mxlch-write-csv dir)))))
 
 
 

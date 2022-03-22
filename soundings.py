@@ -190,6 +190,15 @@ def fortran_print_bool(x):
     else:
         return '.false.'
 
+def set_minimum_wind(x):
+    """set a minimum wind speed (0.05 m/s), because model will articially exit if windspeed less that 1 cm/s"""
+    if x == 0.0:
+        x = 0.05
+    elif abs(x) < 0.05:
+        x = 0.05*x/abs(x)
+    return x
+
+
 elisp_conversion_functions = {
     'CO2' : ppm_to_ppb,
     'dCO2' : ppm_to_ppb,
@@ -209,6 +218,8 @@ elisp_conversion_functions = {
     'sw_shearwe' : fortran_print_bool,
     'sw_sl' : fortran_print_bool,
     'sw_cu' : fortran_print_bool,
+    'u' : set_minimum_wind,
+    'v' : set_minimum_wind,
     }
 
 elisp_conversion = {
