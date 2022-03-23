@@ -23,6 +23,14 @@
   :type 'string
   :group 'mxlch)
 
+(defcustom mxlch-repo-dir (concat (getenv "HOME") "/land-atmosphere")
+  "The directory for the land-atmosphere repository.
+
+TODO: could probably set this with introspection, because it is wherever
+this file is!"
+  :type 'string
+  :group 'mxlch)
+
 (defcustom mxlch-data-dir (concat (getenv "HOME") "/land-atmosphere/data")
   "The directory to find MXLCH data and simulations, as output by soundings.py."
   :type 'string
@@ -151,34 +159,48 @@
   (save-buffer)
   (kill-buffer))
 
-(defun mxlch-write-namelists ()
-  "Write all namelists for experiments in `mxlch-data-dir'."
-  (interactive)
+
+(defun mxlch-write-namelists (arg)
+  "Write all namelists for experiments in `mxlch-data-dir'.
+
+Will do nothing if a namelist already exists, unless prefix argument ARG is positive.
+
+In that case, it will overwrite the namelist."
+  (interactive "P")
   (mxlch-set-non-default-constants)
   (let ((inputs (directory-files-recursively mxlch-data-dir (rx  (*? anything) "input.el"))))
     (dolist (input inputs)
-      (load input)
-      (mxlch-write-namelist (concat (file-name-directory input)
-                                    "namoptions")))
+      (let ((namelist-path (concat (file-name-directory input)
+                                   "namoptions")))
+        (when (or arg
+                  (not (file-exists-p namelist-path)))
+          (load input)
+          (mxlch-write-namelist namelist-path))))
     't))
 
-(defun mxlch-run-models ()
+(defun mxlch-run-models (arg)
   "Run all models for experiments in `mxlch-data-dir'.
+
+Will only run a model if there is no \"model-run.out file\", AND
+the prefix ARG is false.
 
 This could be asnychronous, but we end up with too many pipes open.
 
 Would have to use a more sophisticated handler using sentinels in that case."
-  (interactive)
+  (interactive "P")
   (let ((inputs (directory-files-recursively mxlch-data-dir (rx  (*? anything) "input.el"))))
     (dolist (input inputs)
-      (let ((default-directory  (file-name-directory input)))
-        (call-process "rm" nil nil nil "-rf" (concat default-directory "RUN00") "model-run.out")
-        (call-process
-         (concat mxlch-dir "/MXLCH")
-         nil
-         `(:file ,(concat default-directory "/model-run.out"))
-         nil
-         (concat mxlch-dir "/chem.inp.op3"))))
+      (let* ((default-directory  (file-name-directory input))
+             (output-log (concat default-directory "/model-run.out")))
+        (when (or arg
+                  (not (file-exists-p output-log)))
+          (call-process "rm" nil nil nil "-rf" (concat default-directory "RUN00") "model-run.out")
+          (call-process
+           (concat mxlch-dir "/MXLCH")
+           nil
+           `(:file ,(concat default-directory "/model-run.out"))
+           nil
+           (concat mxlch-dir "/chem.inp.op3")))))
     't))
 
 (defun mxlch-extract-et (dir)
@@ -256,9 +278,13 @@ The returned data structure will be a list of length 3:
     (list experiment-name mxlch-wg et)))
 
 
+(defun mxlch-csv-file-name (dir)
+  "Generate a csv filename from experiment directory DIR."
+  (concat (directory-file-name dir) ".csv"))
+
 (defun mxlch-write-csv (dir)
   "Write a csv from all experiments in DIR."
-  (let ((filename (concat (directory-file-name dir) ".csv"))
+  (let ((filename (mxlch-csv-file-name dir))
         (inputs (directory-files-recursively dir (rx  (*? anything) "input.el"))))
     (find-file filename)
     (erase-buffer)
@@ -271,16 +297,43 @@ The returned data structure will be a list of length 3:
     (save-buffer)
     (kill-buffer)))
 
-(defun mxlch-write-all-csvs ()
+(defun mxlch-write-all-csvs (arg)
   "Write all model output csvs.
 
-Call `mxlch-write-csv' on every directory in `mxlch-data-dir'."
-  (interactive)
+Call `mxlch-write-csv' on every directory in `mxlch-data-dir'.
+
+This will only be called if prefix ARG is true, OR there is no existing CSV file."
+  (interactive "P")
   (let ((exp-dirs (directory-files mxlch-data-dir t (rx (not ?.) (*? anything)))))
     (dolist (dir exp-dirs)
-      (when (file-directory-p dir)
+      (when (and (file-directory-p dir)
+                 (or arg
+                     (not (file-exists-p (mxlch-csv-file-name dir)))))
           (mxlch-write-csv dir)))))
 
+(defun mxlch-run-analysis (arg)
+  "Run all analysis functions, passing prefix ARG to each ones.
+
+Currently, this invovles:
+
+1. calling python3 soundings.py
+2. `mxlch-write-nameslists'
+3. `mxlch-run-models'
+4. `mxlch-write-all-csvs'.
+
+Basically, call this function with a prefix argument if you want to rerun
+all analyses and rewrite output data."
+  (interactive "P")
+  (let ((default-directory mxlch-repo-dir))
+    (call-process "python3"
+                  nil
+                  '(:file "soundings.out")
+                  nil
+                  "soundings.py"))
+  (mxlch-write-namelists arg)
+  (mxlch-run-models arg)
+  (mxlch-write-all-csvs arg)
+  'ok)
 
 
 ;;;; Name options

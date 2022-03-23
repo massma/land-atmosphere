@@ -23,7 +23,8 @@ def load_experiment(name):
 
 causal = load_experiment("causal")
 decorrelated = load_experiment("decorrelated")
-reality = load_experiment("reality")
+reality = load_experiment("kelowna-reality")
+reality2 = load_experiment("dt-1-kelowna-reality")
 subsampled = decorrelated.sample(n=reality.shape[0], random_state=1)
 subsampled2 = decorrelated.sample(n=reality.shape[0], random_state=15)
 
@@ -81,7 +82,6 @@ for (legend, model) in zip(["naive", "subsampled", "subsampled2", "decorrelated"
                             sample_limited_model2, decorrelated_model]):
     ax.plot(np.squeeze(xlim), np.squeeze(model.predict(xlim)), label=legend)
 plt.legend()
-
 
 
 plt.show()

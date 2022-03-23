@@ -191,16 +191,20 @@ def fortran_print_bool(x):
         return '.false.'
 
 def set_minimum_wind(x):
-    """set a minimum wind speed (0.05 m/s), because model will articially exit if windspeed less that 1 cm/s"""
+    """set a minimum wind speed (0.1 m/s), because model will articially exit if windspeed less that 1 cm/s"""
     if x == 0.0:
-        x = 0.05
-    elif abs(x) < 0.05:
-        x = 0.05*x/abs(x)
+        x = 0.1
+    elif abs(x) < 0.1:
+        x = 0.1*x/abs(x)
     return x
 
 
+def set_minimum_ABL_height(x):
+    return max(x, 40.0)
+
 elisp_conversion_functions = {
     'CO2' : ppm_to_ppb,
+    'h' : set_minimum_ABL_height,
     'dCO2' : ppm_to_ppb,
     'gammaCO2' : ppm_to_ppb,
     'wCO2' : ppm_to_ppb,
@@ -271,21 +275,21 @@ elisp_conversion = {
     'mxlch-thetam0' : 'theta',
     'mxlch-hour' : 'tstart',
     'mxlch-um0' : 'u',
-    'mxlch-uv0' : 'v',
+    'mxlch-vm0' : 'v',
     'mxlch-ug' : 'u',
     'mxlch-vg' : 'v',
     'mxlch-w2' : 'w_average',
     'mxlch-wg' :'w_average',
-    'mxlch-wcsmax' : 'wCO2', # same comment as wtheta; these are used slightly differently
+    # 'mxlch-wcsmax' : 'wCO2', # same comment as wtheta; these are used slightly differently
     'mxlch-wfc' : 'wfc',
-    'mxlch-wqsmax' : 'wq', # same comment as wtheta; these are used
-                           # slightly differently; we may also want to
-                           # set these as offsets and use a constant
-                           # flux function??? we really need to
-                           # understand how 'wq' gets sued, and how
-                           # the offset functions get used. so onl
+    # 'mxlch-wqsmax' : 'wq', # same comment as wtheta; these are used
+    #                        # slightly differently; we may also want to
+    #                        # set these as offsets and use a constant
+    #                        # flux function??? we really need to
+    #                        # understand how 'wq' gets sued, and how
+    #                        # the offset functions get used. so onl
     'mxlch-wsat' : 'wsat',
-    'mxlch-wthetasmax' : 'wtheta', # this might not be right
+    # 'mxlch-wthetasmax' : 'wtheta', # this might not be right
     'mxlch-wwilt' : 'wwilt',
     'mxlch-z0h' : 'z0h',
     'mxlch-z0m' : 'z0m',
@@ -336,11 +340,8 @@ def write_experiment(prefix_f, df):
 
 kelowna = dataframe_from_records(False, load_records('kelowna'))
 
-write_experiment(lambda df: 'reality/kelowna_%d_%04d_%03d' % (df.STNID, df.datetime.year, df.doy),
-                 kelowna)
 
-n = 10000
-
+n = 1000
 
 def causal_experiment(n, df):
     """generate a dataexperiment of a causal experiment N long, using DF to generate data
@@ -362,8 +363,6 @@ uniform sampling
 
 df_causal = causal_experiment(n, kelowna)
 
-write_experiment(lambda df: 'causal/kelowna_%d_%06d' % (df.STNID, df.n), df_causal)
-
 # TODO:
 
 def decorrelated_experiment(n, df):
@@ -382,5 +381,10 @@ using DF to generate data
 
 df_decorrelated = decorrelated_experiment(n, kelowna)
 
-write_experiment(lambda df: 'decorrelated/kelowna_%d_%06d' % (df.STNID, df.n),
-                 df_decorrelated)
+write_experiment(lambda df: 'kelowna-reality/kelowna_%d_%04d_%03d' % (df.STNID, df.datetime.year, df.doy),
+                 kelowna)
+
+# write_experiment(lambda df: 'kelowna-causal/kelowna_%d_%06d' % (df.STNID, df.n), df_causal)
+
+# write_experiment(lambda df: 'kelowna-decorrelated/kelowna_%d_%06d' % (df.STNID, df.n),
+#                  df_decorrelated)
