@@ -341,7 +341,7 @@ def write_experiment(prefix_f, df):
 kelowna = dataframe_from_records(False, load_records('kelowna'))
 
 
-n = 1000
+n = 10000
 
 def causal_experiment(n, df):
     """generate a dataexperiment of a causal experiment N long, using DF to generate data
@@ -384,7 +384,7 @@ df_decorrelated = decorrelated_experiment(n, kelowna)
 write_experiment(lambda df: 'kelowna-reality/kelowna_%d_%04d_%03d' % (df.STNID, df.datetime.year, df.doy),
                  kelowna)
 
-# write_experiment(lambda df: 'kelowna-causal/kelowna_%d_%06d' % (df.STNID, df.n), df_causal)
+write_experiment(lambda df: 'kelowna-causal/kelowna_%d_%06d' % (df.STNID, df.n), df_causal)
 
-# write_experiment(lambda df: 'kelowna-decorrelated/kelowna_%d_%06d' % (df.STNID, df.n),
-#                  df_decorrelated)
+write_experiment(lambda df: 'kelowna-decorrelated/kelowna_%d_%06d' % (df.STNID, df.n),
+                 df_decorrelated)

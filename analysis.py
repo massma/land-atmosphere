@@ -14,24 +14,21 @@ from sklearn.linear_model import LinearRegression
 
 data_dir = "./data"
 
-experiments = ["causal", "decorrelated", "reality"]
+experiments = ["kelowna-causal", "kelowna-decorrelated", "kelowna-reality"]
 
 def load_experiment(name):
     "Load experiment NAME."
     df = pd.read_csv("%s/%s.csv" % (data_dir, name))
     return df[~np.isnan(df.ET)]
 
-causal = load_experiment("causal")
-decorrelated = load_experiment("decorrelated")
+NSAMPLE = 10
+causal = load_experiment("kelowna-causal")
+decorrelated = load_experiment("kelowna-decorrelated")
 reality = load_experiment("kelowna-reality")
-reality2 = load_experiment("dt-1-kelowna-reality")
-subsampled = decorrelated.sample(n=reality.shape[0], random_state=1)
-subsampled2 = decorrelated.sample(n=reality.shape[0], random_state=15)
-
+subsamples = [decorrelated.sample(n=reality.shape[0], random_state=i) for i in range(NSAMPLE)]
 
 naive_model = LinearRegression()
-sample_limited_model = LinearRegression()
-sample_limited_model2 = LinearRegression()
+sample_models = [LinearRegression() for _s in subsamples]
 decorrelated_model = LinearRegression()
 
 def prep_x_data(ds):
@@ -40,8 +37,10 @@ def prep_x_data(ds):
 
 
 naive_model.fit(X=prep_x_data(reality.SM), y=reality.ET)
-sample_limited_model.fit(X=prep_x_data(subsampled.SM), y=subsampled.ET)
-sample_limited_model2.fit(X=prep_x_data(subsampled2.SM), y=subsampled2.ET)
+
+for (model, data) in zip(sample_models, subsamples):
+    model.fit(X=prep_x_data(data.SM), y=data.ET)
+
 decorrelated_model.fit(X=prep_x_data(decorrelated.SM), y=decorrelated.ET)
 
 def rmse(truth, prediction):
@@ -69,19 +68,20 @@ def print_model_diagnostics(model_string, model):
     return (_bias, _rmse)
 
 (bias_naive, rmse_naive) = print_model_diagnostics('Confounding + sampling + model specification', naive_model)
-(bias_sample, rmse_sample) = print_model_diagnostics('Sampling + model specification', sample_limited_model)
-(bias_sample2, rmse_sample2) = print_model_diagnostics('Sampling2 + model specification', sample_limited_model2)
+bias_rmse_samples = [print_model_diagnostics('Sampling %d + model specification' % i, model)
+                     for (i, model) in zip(range(NSAMPLE), sample_models)]
 (bias_confounding, rmse_confounding) =\
     print_model_diagnostics('(Linear) model specification', decorrelated_model)
 
 facet = sns.relplot(data=causal, x='SM', y='ET')
 ax = facet.ax
 xlim = np.array(ax.get_xlim()).reshape(-1, 1)
-for (legend, model) in zip(["naive", "subsampled", "subsampled2", "decorrelated"],
-                           [naive_model, sample_limited_model,
-                            sample_limited_model2, decorrelated_model]):
-    ax.plot(np.squeeze(xlim), np.squeeze(model.predict(xlim)), label=legend)
+
+for (i, model) in zip(range(NSAMPLE), sample_models):
+    ax.plot(np.squeeze(xlim), np.squeeze(model.predict(xlim)), label=None,linewidth=0.4)
+ax.plot(np.squeeze(xlim), np.squeeze(naive_model.predict(xlim)), label="naive")
+ax.plot(np.squeeze(xlim), np.squeeze(decorrelated_model.predict(xlim)),
+        label="decorrelated")
+
 plt.legend()
-
-
 plt.show()
