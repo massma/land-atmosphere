@@ -127,7 +127,7 @@ non-floating data) from a dataframe DF_INPUT"""
         try:
            std_dev = df_input[key].std()
            if std_dev > (abs(0.001 * df_input[key].mean())):
-               variability_keys.append(key)
+               variability_keys.append((key, std_dev))
            else:
                constant_keys.append(key)
         except TypeError:
@@ -326,10 +326,12 @@ e.g., lamda x: '%d_%04d_%03d' % (series.STNID, series.datetime.year, series.doy)
 geostrophic wind tosomethign other than mixed layer wind")
     pwd = 'data/%s'% (prefix_f(series))
     os.makedirs(pwd, exist_ok=True)
-    f = open("%s/input.el" % pwd, 'w')
-    for key in elisp_conversion.keys():
-        write_variable(key, series, f)
-    f.close()
+    input_path = "%s/input.el" % pwd
+    if (not os.path.exists(input_path)):
+        f = open(input_path, 'w')
+        for key in elisp_conversion.keys():
+            write_variable(key, series, f)
+        f.close()
     return True
 
 def write_experiment(prefix_f, df):
@@ -340,11 +342,77 @@ def write_experiment(prefix_f, df):
 
 kelowna = dataframe_from_records(False, load_records('kelowna'))
 
+(var_keys, _constant_key, not_a_number_keys) =\
+    generate_variability_keys(kelowna)
+
+for (key, std) in var_keys:
+    print("%s: %f" % (key, std))
+
+# (wind & bl height), (temperatre), (moisture), (doy), (cloud cover), (lai)
 
 n = 10000
 
+def montecarlo_correlated(n, df, columns=None):
+    """Generate N samples of DF witht the same correlation structure as DF
+    for COLUMNS.  All other indices will be randomized (uncorrelated
+    with each other and the correlated variables
+
+    If columns is None, then all variables will be correlated.
+
+    """
+    index_range = range(n)
+    if columns:
+        random_df = pd.DataFrame([df.iloc[random.randrange(df.shape[0])]
+                                  for _i in index_range],
+                                 index=index_range)
+        for (label, datas) in df.iteritems():
+            if label not in columns:
+                random_df[label] = \
+                    [datas.iloc[random.randrange(df.shape[0])] for _i in index_range]
+    else:
+        random_df =
+            pd.DataFrame([df.iloc[random.randrange(df.shape[0])] for _i in index_range],
+                         index=index_range)
+
+    random_df['n'] = index_range
+    return random_df
+
+def montecarlo_decorrelated(n, df, columns=None):
+    """Genearte N samples of DF where COLUMNS are randomized from each
+other, but all other variables have the same correlation structure as
+DF. If columns is None, all columsn will be decorrelated."""
+    correlated_index = df.columns
+    if columns:
+        random_df = montecarlo_correlated(n, df, columns=list(set(df.columns) - set(columns)))
+    else:
+        random_df = pd.DataFrame(index=index_range)
+        for (label, datas) in df.iteritems():
+            random_df[label] = \
+                [datas.iloc[random.randrange(df.shape[0])] for _i in index_range]
+    return random_df
+
+
+def decorrelated_dynamics(n, df):
+
+    """generate data of where dynamics (wind speed and bl height) are
+decorrelated from everything else
+
+data are N long, and generated from DF."""
+    random.seed(a=1)
+    index_range = range(n)
+    random_df = \
+       pd.DataFrame([df.iloc[random.randrange(df.shape[0])] for _i in index_range],
+                    index=index_range)
+    random_df['u'] =
+    random_df['v'] =
+    random_df['h']
+    random_df['n'] = index_range
+    return random_df
+
+
 def causal_experiment(n, df):
-    """generate a dataexperiment of a causal experiment N long, using DF to generate data
+
+    """generate a data of a causal experiment N long, using DF to generate data
 
 Note that this assumes we are only interested in sampling soil mosture between
 (df.w_average.min() - df.w_average.std()) and df.w_average.max(), and it uses a
@@ -366,16 +434,12 @@ df_causal = causal_experiment(n, kelowna)
 # TODO:
 
 def decorrelated_experiment(n, df):
-    """generate a dataexperiment of a decorrelated synoptic data N long,
+    """generate a data of a decorrelated synoptic data N long,
 using DF to generate data
 
     """
     random.seed(a=1)
     index_range = range(n)
-    random_df = pd.DataFrame(index=index_range)
-    for (label, datas) in df.iteritems():
-        random_df[label] = \
-            [datas.iloc[random.randrange(df.shape[0])] for _i in index_range]
     random_df['n'] = index_range
     return random_df
 
