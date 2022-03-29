@@ -12,26 +12,40 @@ sns.set_theme()
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 
+# causal graph
+# fig 1/2: "truth vertical line" and then two histograms of decorrelaed and the naive
+# fig 2/3: same, but breaking down each experiment (might need to do mulitple pair wise figures if this gets ugly
+
 data_dir = "./data"
 
 def load_experiment(name):
     """Load experiment NAME."""
     df = pd.read_csv("%s/kelowna-%s.csv" % (data_dir, name))
-    return {'df' : df[~np.isnan(df.ET)]}
+    return df[~np.isnan(df.ET)]
 
 def prep_x_data(ds):
     """Take a dataseries DS and make it into the form needed by scikit fit."""
     return ds.to_numpy().reshape(-1, 1)
 
+NSAMPLE = 10
+
 def fit_models(experiments):
     """load experiment and fit model for experiment NAME"""
     for (_name, d) in experiments.items():
+        samples = [d['df'].sample(n=experiments['reality']['df'].shape[0],
+                                  replace=True
+                                  random_state=i)
+                   for i in range(NSAMPLE)]
+        models = [LinearRegression() for i in range(NSAMPLE)]
+        for m,df in zip(models,samples):
+            m.fit(X=prep_x_data(df.SM), y=df.ET)
         model = LinearRegression()
         model.fit(X=prep_x_data(d['df'].SM), y=d['df'].ET)
+        d['samples'] = samples
+        d['models'] = models
         d['model'] = model
     return experiments
 
-NSAMPLE = 10
 
 experiment_names = ['causal',
                     'randomized',
@@ -41,19 +55,15 @@ experiment_names = ['causal',
                     'moisture',
                     'doy',
                     'cc',
+                    'doy-lai-temperature',
+                    'lai-temperature',
                     'reality']
 
-experiments = dict([(name, load_experiment(name)) for name in experiment_names])
-samples = dict([('sample%04d' % i,
-                 {'df' :
-                  experiments['randomized']['df']\
-                  .sample(n=experiments['reality']['df'].shape[0],
-                          random_state=i)})
-                 for i in range(NSAMPLE)])
-samples['causal'] = experiments['causal']
+experiments = dict([(name, {'df' : load_experiment(name)}) for name in experiment_names])
+(train, TEST_DF) = train_test_split(experiments['causal']['df'])
+experiments['causal'] = {'df' : train}
 
 experiments = fit_models(experiments)
-samples = fit_models(samples)
 
 
 def rmse(truth, prediction):
@@ -70,47 +80,43 @@ def model_diagnostics(experiments):
 Mutates each dictionary in EXPERIMENTS, adding prediction, bias, and rmse"""
     causal = experiments['causal']['df']
     for (model_string, d) in experiments.items():
-        d['prediction'] = d['model'].predict(prep_x_data(causal.SM))
-        d['bias'] = bias(causal.ET, d['prediction'])
-        d['rmse'] = rmse(causal.ET, d['prediction'])
-        print("%s bias: %f" % (model_string, d['bias']))
-        print("%s rmse: %f" % (model_string, d['rmse']))
-        ## below plot not very useful
-        # facet = sns.displot(x=causal.ET, y=np.squeeze(d['prediction']))
-        # ax = facet.ax
-        # ax.set_title('%s' % model_string)
-        # xlim = ax.get_xlim()
-        # ylim = ax.get_ylim()
-        # lim = [max([xlim[0], ylim[0]]), min([xlim[1], ylim[1]])]
-        # ax.plot(lim, lim)
+        d['prediction'] = d['model'].predict(prep_x_data(TEST_DF.SM))
+        d['bias'] = bias(TEST_DF.ET, d['prediction'])
+        d['rmse'] = rmse(TEST_DF.ET, d['prediction'])
+        d['slope'] = float(d['model'].coef_)
+        predictions = [m.predict(prep_x_data(TEST_DF.SM))
+                       for m, df in zip(d['models'], d['samples'])]
+        d['predictions'] = predictions
+        d['slopes'] = [float(m.coef_) for m in d['models']]
+        d['biases'] = [bias(TEST_DF.ET, p) for p in predictions]
+        d['rmses'] = [rmse(TEST_DF.ET, p) for p in predictions]
     return experiments
 
 experiments = model_diagnostics(experiments)
-samples = model_diagnostics(samples)
 
-samples.pop('causal')
-
-mean_sampling_bias = np.average([d['bias'] for d in samples.values()])
-std_sampling_bias = np.std([d['bias'] for d in samples.values()])
-
-
-def scatter_plot(experiments, samples=False, scatter='causal'):
+def scatter_plot(experiments, data=TEST_DF, title=''):
     """return a scatter plot of DATA with regression fits overlaid"""
-    facet = sns.relplot(data=experiments[scatter]['df'], x='SM', y='ET')
+    facet = sns.relplot(data=data, x='SM', y='ET')
     ax = facet.ax
     xlim = np.array(ax.get_xlim()).reshape(-1, 1)
-    if samples:
-        for d in samples.values():
-            ax.plot(np.squeeze(xlim), np.squeeze(d['model'].predict(xlim)), label=None,linewidth=0.4)
     for (name, d) in experiments.items():
         ax.plot(np.squeeze(xlim), np.squeeze(d['model'].predict(xlim)), label=name)
-    plt.title('scattered data: %s' % scatter)
+    plt.title(title)
     plt.legend()
     return
 
-scatter_plot(experiments, scatter='causal')
-scatter_plot(experiments, scatter='reality')
+
+def hist_plot_1(experiments, accessor='biases'):
+    ax = sns.histplot(data=experiments['randomized'][accessor], kde=True, label='randomized')
+    ax = sns.histplot(data=experiments['reality'][accessor], kde=True, ax=ax, label='naive')
+    plt.show()
+    return
+hist_plot_1(experiments)
+
+scatter_plot(experiments)
+scatter_plot(experiments, data=experiments['randomized']['df'])
 plt.show()
+
 def sum_biases(keys, experiments):
     """add up all the biases in EXPERIMENTS corresponding to keys"""
     sum = 0.0
@@ -118,5 +124,9 @@ def sum_biases(keys, experiments):
         sum = sum + experiments[x]['bias']
     return sum
 exps = set(experiment_names) - {'reality', 'causal'}
+
 biases = sum_biases(exps, experiments) + mean_sampling_bias
+
+b2 = sum_biases({'doy', 'lai', 'temperature'}, experiments)
+
 plt.show()
