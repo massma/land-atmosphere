@@ -396,15 +396,17 @@ correlated with SM and everything else is random
 data are N long, and generated from DF."""
     return montecarlo_correlated(n, df, correlated_columns={'LAI', 'w_average'})
 
+
+TEMPERATURE_KEYS = {'T2', 'Ts', 'Tsoil', 'theta',
+                    'advt_tropo', 'w_average'}
+
 def correlated_temperature(n, df):
 
     """generate data where temeprature is
 correlated with SM and everything else is random
 
 data are N long, and generated from DF."""
-    return montecarlo_correlated(n, df, correlated_columns=\
-                                 {'T2', 'Ts', 'Tsoil', 'theta',
-                                  'advt_tropo', 'w_average'})
+    return montecarlo_correlated(n, df, correlated_columns=TEMPERATURE_KEYS)
 
 def correlated_moisture(n, df):
 
@@ -423,6 +425,24 @@ correlated with SM and everything else is random
 data are N long, and generated from DF."""
     return montecarlo_correlated(n, df, correlated_columns=\
                                  {'doy', 'w_average'})
+
+def correlated_doy_lai_temperature(n, df):
+
+    """generate data where doy is
+correlated with SM and everything else is random
+
+data are N long, and generated from DF."""
+    return montecarlo_correlated(n, df, correlated_columns=\
+                                 TEMPERATURE_KEYS.union({'doy', 'LAI'}))
+
+def correlated_lai_temperature(n, df):
+
+    """generate data where doy is
+correlated with SM and everything else is random
+
+data are N long, and generated from DF."""
+    return montecarlo_correlated(n, df, correlated_columns=\
+                                 TEMPERATURE_KEYS.union({'LAI'}))
 
 def correlated_cc(n, df):
 
@@ -470,6 +490,8 @@ experiments = {
     'moisture' : correlated_moisture,
     'doy' : correlated_doy,
     'cc' : correlated_cc,
+    'doy-lai-temperature': correlated_doy_lai_temperature
+    'lai-temperature': correlated_lai_temperature
     }
 
 write_experiment(lambda df: 'kelowna-reality/kelowna_%d_%04d_%03d' % (df.STNID, df.datetime.year, df.doy),
