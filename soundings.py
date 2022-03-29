@@ -352,63 +352,86 @@ for (key, std) in var_keys:
 
 n = 10000
 
-def montecarlo_correlated(n, df, columns=None):
-    """Generate N samples of DF witht the same correlation structure as DF
-    for COLUMNS.  All other indices will be randomized (uncorrelated
-    with each other and the correlated variables
-
-    If columns is None, then all variables will be correlated.
-
-    """
-    index_range = range(n)
-    if columns:
-        random_df = pd.DataFrame([df.iloc[random.randrange(df.shape[0])]
-                                  for _i in index_range],
-                                 index=index_range)
-        for (label, datas) in df.iteritems():
-            if label not in columns:
-                random_df[label] = \
-                    [datas.iloc[random.randrange(df.shape[0])] for _i in index_range]
-    else:
-        random_df =
-            pd.DataFrame([df.iloc[random.randrange(df.shape[0])] for _i in index_range],
-                         index=index_range)
-
-    random_df['n'] = index_range
-    return random_df
-
-def montecarlo_decorrelated(n, df, columns=None):
+def montecarlo_randomized(n, df, randomized_columns=None):
     """Genearte N samples of DF where COLUMNS are randomized from each
 other, but all other variables have the same correlation structure as
-DF. If columns is None, all columsn will be decorrelated."""
-    correlated_index = df.columns
-    if columns:
-        random_df = montecarlo_correlated(n, df, columns=list(set(df.columns) - set(columns)))
-    else:
-        random_df = pd.DataFrame(index=index_range)
-        for (label, datas) in df.iteritems():
+DF. If randomized_columns is None, all columns will be randomized."""
+    random.seed(a=1)
+    if randomized_columns is None:
+        randomized_columns = df.columns
+    index_range = range(n)
+    random_df = pd.DataFrame([df.iloc[random.randrange(df.shape[0])]
+                              for _i in index_range],
+                             index=index_range)
+    for (label, datas) in df.iteritems():
+        if label in randomized_columns:
             random_df[label] = \
                 [datas.iloc[random.randrange(df.shape[0])] for _i in index_range]
-    return random_df
-
-
-def decorrelated_dynamics(n, df):
-
-    """generate data of where dynamics (wind speed and bl height) are
-decorrelated from everything else
-
-data are N long, and generated from DF."""
-    random.seed(a=1)
-    index_range = range(n)
-    random_df = \
-       pd.DataFrame([df.iloc[random.randrange(df.shape[0])] for _i in index_range],
-                    index=index_range)
-    random_df['u'] =
-    random_df['v'] =
-    random_df['h']
     random_df['n'] = index_range
     return random_df
 
+def montecarlo_correlated(n, df, correlated_columns=set()):
+    """Generate N samples of DF witht the same correlation structure as DF
+    for COLUMNS.  All other indices will be randomized (uncorrelated
+    with each other and the correlated variables.
+
+    """
+    return montecarlo_randomized(n, df,
+                                   randomized_columns=(set(df.columns)
+                                                       - set(correlated_columns)))
+
+def correlated_dynamics(n, df):
+
+    """generate data of where dynamics (wind speed and bl height) are
+correlated with SM and everything else is random
+
+data are N long, and generated from DF."""
+    return montecarlo_correlated(n, df, correlated_columns={'u', 'v', 'h', 'w_average'})
+
+def correlated_lai(n, df):
+
+    """generate data of where lai is
+correlated with SM and everything else is random
+
+data are N long, and generated from DF."""
+    return montecarlo_correlated(n, df, correlated_columns={'LAI', 'w_average'})
+
+def correlated_temperature(n, df):
+
+    """generate data where temeprature is
+correlated with SM and everything else is random
+
+data are N long, and generated from DF."""
+    return montecarlo_correlated(n, df, correlated_columns=\
+                                 {'T2', 'Ts', 'Tsoil', 'theta',
+                                  'advt_tropo', 'w_average'})
+
+def correlated_moisture(n, df):
+
+    """generate data where moisture is
+correlated with SM and everything else is random
+
+data are N long, and generated from DF."""
+    return montecarlo_correlated(n, df, correlated_columns=\
+                                 {'q', 'advq_tropo', 'w_average'})
+
+def correlated_doy(n, df):
+
+    """generate data where doy is
+correlated with SM and everything else is random
+
+data are N long, and generated from DF."""
+    return montecarlo_correlated(n, df, correlated_columns=\
+                                 {'doy', 'w_average'})
+
+def correlated_cc(n, df):
+
+    """generate data where cloud cover is
+correlated with SM and everything else is random
+
+data are N long, and generated from DF."""
+    return montecarlo_correlated(n, df, correlated_columns=\
+                                 {'cc', 'w_average'})
 
 def causal_experiment(n, df):
 
@@ -423,32 +446,37 @@ uniform sampling
     max_sm = df.w_average.max()
     index_range = range(n)
     random_df = \
-       pd.DataFrame([df.iloc[random.randrange(df.shape[0])] for _i in index_range],
-                    index=index_range)
-    random_df['w_average'] = [random.uniform(min_sm, max_sm) for _i in index_range]
-    random_df['n'] = index_range
+       montecarlo_correlated(n, df, correlated_columns=set(df.columns))
+    random_df['w_average'] = [random.uniform(min_sm, max_sm) for _i in random_df.index]
     return random_df
-
-df_causal = causal_experiment(n, kelowna)
 
 # TODO:
 
-def decorrelated_experiment(n, df):
-    """generate a data of a decorrelated synoptic data N long,
+def randomized_experiment(n, df):
+    """generate a data of a randomized synoptic data N long,
 using DF to generate data
 
     """
-    random.seed(a=1)
-    index_range = range(n)
-    random_df['n'] = index_range
-    return random_df
+    return montecarlo_randomized(n, df, randomized_columns=set(df.columns))
 
-df_decorrelated = decorrelated_experiment(n, kelowna)
+
+# dictionary of name:function of n, df for generating data
+experiments = {
+    'causal' : causal_experiment,
+    'randomized' : randomized_experiment,
+    'dynamics' : correlated_dynamics,
+    'lai' : correlated_lai,
+    'temperature' : correlated_temperature,
+    'moisture' : correlated_moisture,
+    'doy' : correlated_doy,
+    'cc' : correlated_cc,
+    }
 
 write_experiment(lambda df: 'kelowna-reality/kelowna_%d_%04d_%03d' % (df.STNID, df.datetime.year, df.doy),
                  kelowna)
 
-write_experiment(lambda df: 'kelowna-causal/kelowna_%d_%06d' % (df.STNID, df.n), df_causal)
-
-write_experiment(lambda df: 'kelowna-decorrelated/kelowna_%d_%06d' % (df.STNID, df.n),
-                 df_decorrelated)
+for index in experiments.keys():
+    directory = 'kelowna-%s' % index
+    if not os.path.exists(directory):
+        write_experiment(lambda df: '%s/kelowna_%d_%06d' % (directory, df.STNID, df.n),
+                         experiments[index](n, kelowna))
