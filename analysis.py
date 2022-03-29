@@ -27,13 +27,13 @@ def prep_x_data(ds):
     """Take a dataseries DS and make it into the form needed by scikit fit."""
     return ds.to_numpy().reshape(-1, 1)
 
-NSAMPLE = 10
+NSAMPLE = 100
 
 def fit_models(experiments):
     """load experiment and fit model for experiment NAME"""
     for (_name, d) in experiments.items():
         samples = [d['df'].sample(n=experiments['reality']['df'].shape[0],
-                                  replace=True
+                                  replace=True,
                                   random_state=i)
                    for i in range(NSAMPLE)]
         models = [LinearRegression() for i in range(NSAMPLE)]
@@ -60,7 +60,7 @@ experiment_names = ['causal',
                     'reality']
 
 experiments = dict([(name, {'df' : load_experiment(name)}) for name in experiment_names])
-(train, TEST_DF) = train_test_split(experiments['causal']['df'])
+(train, TEST_DF) = train_test_split(experiments['causal']['df'], random_state=0)
 experiments['causal'] = {'df' : train}
 
 experiments = fit_models(experiments)
@@ -106,27 +106,44 @@ def scatter_plot(experiments, data=TEST_DF, title=''):
     return
 
 
-def hist_plot_1(experiments, accessor='biases'):
-    ax = sns.histplot(data=experiments['randomized'][accessor], kde=True, label='randomized')
-    ax = sns.histplot(data=experiments['reality'][accessor], kde=True, ax=ax, label='naive')
-    plt.show()
+def hist_plot(experiments, accessor='biases',
+              f=lambda x: x, extra_experiment=None):
+    """make a histogram plot"""
+    fig, ax = plt.subplots()
+    ax = sns.histplot(data=f(experiments['randomized'][accessor]), kde=True, label='randomized')
+
+    if extra_experiment:
+        ax = sns.histplot(data=f(experiments[extra_experiment][accessor]),
+                          kde=True, label='%s confounded' % extra_experiment,
+                          color='grey')
+    ax = sns.histplot(data=f(experiments['reality'][accessor]), kde=True, ax=ax, label='naive', color='m')
+    ylim = ax.get_ylim()
+    if accessor == 'biases':
+        x = experiments['causal']['bias']
+    elif accessor == 'slopes':
+        x = experiments['causal']['slope']
+    else:
+        x = np.nan
+    ax.plot(f([x, x]), ylim, label='\"truth\"')
+    plt.legend()
+    ax.set_xlabel(accessor)
     return
-hist_plot_1(experiments)
 
-scatter_plot(experiments)
-scatter_plot(experiments, data=experiments['randomized']['df'])
-plt.show()
+hist_plot(experiments)
+hist_plot(experiments, accessor='slopes')
+for exp in ['dynamics',
+            'lai',
+            'temperature',
+            'moisture',
+            'doy',
+            'cc',
+            'doy-lai-temperature',
+            'lai-temperature']:
+    # hist_plot(experiments, f=np.absolute, extra_experiment=exp)
+    hist_plot(experiments, accessor='slopes', extra_experiment=exp)
 
-def sum_biases(keys, experiments):
-    """add up all the biases in EXPERIMENTS corresponding to keys"""
-    sum = 0.0
-    for x in keys:
-        sum = sum + experiments[x]['bias']
-    return sum
-exps = set(experiment_names) - {'reality', 'causal'}
+# scatter_plot(experiments)
 
-biases = sum_biases(exps, experiments) + mean_sampling_bias
 
-b2 = sum_biases({'doy', 'lai', 'temperature'}, experiments)
 
 plt.show()

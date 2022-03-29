@@ -490,7 +490,7 @@ experiments = {
     'moisture' : correlated_moisture,
     'doy' : correlated_doy,
     'cc' : correlated_cc,
-    'doy-lai-temperature': correlated_doy_lai_temperature
+    'doy-lai-temperature': correlated_doy_lai_temperature,
     'lai-temperature': correlated_lai_temperature
     }
 
