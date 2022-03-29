@@ -110,38 +110,48 @@ def hist_plot(experiments, accessor='biases',
               f=lambda x: x, extra_experiment=None):
     """make a histogram plot"""
     fig, ax = plt.subplots()
-    ax = sns.histplot(data=f(experiments['randomized'][accessor]), kde=True, label='randomized')
+    ax = sns.histplot(data=f(experiments['randomized'][accessor]),
+                      kde=True, label='randomized')
 
     if extra_experiment:
         ax = sns.histplot(data=f(experiments[extra_experiment][accessor]),
                           kde=True, label='%s confounded' % extra_experiment,
                           color='grey')
-    ax = sns.histplot(data=f(experiments['reality'][accessor]), kde=True, ax=ax, label='naive', color='m')
+    ax = sns.histplot(data=f(experiments['reality'][accessor]), kde=True, ax=ax,
+                      label='naive', color='m')
     ylim = ax.get_ylim()
     if accessor == 'biases':
         x = experiments['causal']['bias']
+        xnaive = experiments['reality']['bias']
     elif accessor == 'slopes':
         x = experiments['causal']['slope']
+        xnaive = experiments['reality']['slope']
     else:
         x = np.nan
+        xnaive = np.nan
     ax.plot(f([x, x]), ylim, label='\"truth\"')
+    ax.plot(f([xnaive, xnaive]), ylim)
     plt.legend()
     ax.set_xlabel(accessor)
     return
 
 hist_plot(experiments)
+plt.show()
+
 hist_plot(experiments, accessor='slopes')
+plt.show()
+
 for exp in ['dynamics',
             'lai',
             'temperature',
             'moisture',
             'doy',
-            'cc',
-            'doy-lai-temperature',
-            'lai-temperature']:
-    # hist_plot(experiments, f=np.absolute, extra_experiment=exp)
+            'cc']:
     hist_plot(experiments, accessor='slopes', extra_experiment=exp)
+plt.show()
 
+hist_plot(experiments, accessor='slopes', extra_experiment='lai-temperature')
+plt.show()
 # scatter_plot(experiments)
 
 

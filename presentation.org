@@ -1,0 +1,92 @@
+* Struggling towards reality: causality in land-atmosphere interactions
+  With Olya and Pierre.
+** Feedback
+   - all is very welcome
+   - in particular interested in:
+     - anything that is confusing
+     - how I can improve explanation
+     - improve visualization
+   - want to keep things as simple as possible while still achieving
+     project goals
+** Project Goal
+   - Demonstrate the importance of controlling for [[file:graph.png][confounding]] in
+     observational analyses
+     - Confounding biases results!
+*** Secondary goal
+    - Provide some intuition/guidance for the variables that are most
+      important to control/adjust for when attempting to estimate real
+      land atmosphere causal effects from data (e.g., connect to
+      Olya's efforts).
+
+** Method
+   - Use a [[https://classmodel.github.io/][land-atmosphere model]] to simulate the boundary layer in
+     [[https://www.google.com/maps/place/Kelowna,+BC,+Canada/][Kelowna, BC]]:
+     - alternate realities where confounding does not exist.
+     - causal experiments ("true" effect of soil moisture on evaporation)
+   - Compare observational conclusions in the presence and absence of
+     confounding to:
+     1. Show the degree that confounding can bias results and conclusions
+     2. Suggest which confounders bias results and conclusions the
+        most (guide practitioners)
+
+*** Alternate worlds
+    - *Reality* (all [[https://class4gl.eu/][synoptic variables]] co-vary as they do in the real world)
+    - *Randomized* (no confounding: synoptic variables)
+    - *Selective confounding* (only certain synoptic variables maintain
+      their true joint distribution with soil moisture):
+      - Leaf area index
+      - Day of year
+      - Dynamics (u, v, initial boundary layer height)
+      - Cloud Cover
+      - Moisture (initial q, synoptic advection of q)
+      - Temperature (initial T, Tsoil, Tground, and synoptic advection
+        of temperature)
+*** Regression analysis
+    - *Fit a linear (least squares) model* of evaporation as a function
+      of initial soil moisture in each alternate world
+      - bootstrap to get uncertainty
+
+    - Compare predicted soil moisture to the "true" causal effect of
+      soil moisture on evaporation, as simulated by each model.
+      - Understand how confounding biases results, and which variables
+        are the strongest sources of confounding
+** Sources of error
+   - Model specification (e.g. linear model)
+   - Sampling error (undersample the true joint distribution)
+   - [[file:graph.png][Confounding error]] (induced co-variation between two variables
+     that is not causal)
+*** Competition 1 (sources of error)
+    This is very high stakes.
+
+    - Team Model Specification:
+    - Team Sampling Error:
+    - Team Confounding Error:
+** Sources of confounding (or variable for adjusting for confounding)
+   - Leaf area index
+   - Day of year
+   - Dynamics (u, v, initial boundary layer height)
+   - Cloud Cover
+   - Moisture (initial q, synoptic advection of q)
+   - Temperature (initial T, Tsoil, Tground, and synoptic advection
+     of temperature)
+*** Competition 2 (sources of confounding)
+   - Team LAI:
+   - Team DOY:
+   - Team Dynamics:
+   - Team Cloud Cover:
+   - Team Moisture:
+   - Team Temperature:
+
+** Conclusions
+   - Confounding biases results. In this case, even more than a poorly
+     specified (linear) model, and sampling error (< 1000 days of
+     data).
+   - Being thoughtful about confounding is arguably more important
+     than using the most sophisticated non-linear regression
+     techniques and finding/collecting the most samples.
+   - (all conclusions conditional on this single site)
+
+** Next steps
+   - Repeat analysis for more sites:
+     - *Goal*: understand how confounding and its sources vary as a
+       function of climate & ecosystem.
