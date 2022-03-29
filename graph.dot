@@ -1,0 +1,18 @@
+digraph G {
+
+        climate[label="climate"];
+        synoptic[label="synoptic\n/weather"];
+        ecosystemHistory[label="ecosystem\nhistory"];
+        ecosystem0[label="ecosystem\nstate (t=0)\n(e.g., LAI)"];
+        sm0[label="SM(t=0)"];
+	et[label="average(ET(t>0))"];
+
+        climate -> ecosystemHistory;
+        climate -> ecosystem0;
+        climate -> synoptic;
+        ecosystemHistory -> ecosystem0;
+        ecosystemHistory -> sm0;
+        synoptic -> et;
+        ecosystem0 -> et;
+        sm0 -> et;
+}
