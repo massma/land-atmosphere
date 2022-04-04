@@ -202,6 +202,14 @@ def set_minimum_wind(x):
 def set_minimum_ABL_height(x):
     return max(x, 40.0)
 
+def runtime(tstart):
+    """Calculate a runtime in seconds from tstart in hours.
+
+Note simulation time finish will always be 1600 local,
+because at Kelowna this always ended at 16.049722, so we are conisstent with
+that forumulation"""
+    return (3600.0 * (16.0 - tstart))
+
 elisp_conversion_functions = {
     'CO2' : ppm_to_ppb,
     'h' : set_minimum_ABL_height,
@@ -225,6 +233,8 @@ elisp_conversion_functions = {
     'u' : set_minimum_wind,
     'v' : set_minimum_wind,
     }
+elisp_conversion_functions_elisp_key = {
+    'mxlch-time' : runtime }
 
 elisp_conversion = {
     'mxlch-C1sat' : 'C1sat',
@@ -237,7 +247,6 @@ elisp_conversion = {
     'mxlch-T2' : 'T2',
     'mxlch-Ts' : 'Ts',
     'mxlch-Tsoil' : 'Tsoil',
-    'mxlch-Wl' : 'Wl', # this doesn't vary and is set to default, we could remove
     'mxlch-CLa' : 'a',
     'mxlch-CLb' : 'b',
     'mxlch-CLc' : 'p',
@@ -265,7 +274,7 @@ elisp_conversion = {
     'mxlch-qm0' : 'q',
     'mxlch-rsmin' : 'rsmin',
     'mxlch-rssoilmin' : 'rssoilmin',
-    'mxlch-time' : 'runtime',
+    'mxlch-time' : 'tstart',
     'mxlch-lscu' : 'sw_cu',
     'mxlch-lfixedtroposphere' : 'sw_fixft',
     'mxlch-llandsurface' : 'sw_ls',
@@ -280,16 +289,8 @@ elisp_conversion = {
     'mxlch-vg' : 'v',
     'mxlch-w2' : 'w_average',
     'mxlch-wg' :'w_average',
-    # 'mxlch-wcsmax' : 'wCO2', # same comment as wtheta; these are used slightly differently
     'mxlch-wfc' : 'wfc',
-    # 'mxlch-wqsmax' : 'wq', # same comment as wtheta; these are used
-    #                        # slightly differently; we may also want to
-    #                        # set these as offsets and use a constant
-    #                        # flux function??? we really need to
-    #                        # understand how 'wq' gets sued, and how
-    #                        # the offset functions get used. so onl
     'mxlch-wsat' : 'wsat',
-    # 'mxlch-wthetasmax' : 'wtheta', # this might not be right
     'mxlch-wwilt' : 'wwilt',
     'mxlch-z0h' : 'z0h',
     'mxlch-z0m' : 'z0m',
@@ -299,12 +300,20 @@ elisp_conversion = {
     }
 
 def elisp_print_dispatcher(key, series):
-    """Print the value corresponding to elisp variable KEY in class input pandas SERIES"""
+    """Print the value corresponding to elisp variable KEY in class input pandas SERIES
+
+Constants is a dictionary of key values that are constant across a dataset, but vary at each
+site.
+
+TODO: make constants"""
     pandas_key = elisp_conversion[key]
     try:
         f = elisp_conversion_functions[pandas_key]
     except KeyError:
-        f = lambda x: x
+        try:
+            f = elisp_conversion_functions_elisp_key[key]
+        except KeyError:
+            f = lambda x : x
     return f(series[pandas_key])
 
 
@@ -340,17 +349,6 @@ def write_experiment(prefix_f, df):
         write_row(prefix_f, series)
     return True
 
-kelowna = dataframe_from_records(False, load_records('kelowna'))
-
-(var_keys, _constant_key, not_a_number_keys) =\
-    generate_variability_keys(kelowna)
-
-for (key, std) in var_keys:
-    print("%s: %f" % (key, std))
-
-# (wind & bl height), (temperatre), (moisture), (doy), (cloud cover), (lai)
-
-n = 10000
 
 def montecarlo_randomized(n, df, randomized_columns=None):
     """Genearte N samples of DF where COLUMNS are randomized from each
@@ -494,11 +492,26 @@ experiments = {
     'lai-temperature': correlated_lai_temperature
     }
 
-write_experiment(lambda df: 'kelowna-reality/kelowna_%d_%04d_%03d' % (df.STNID, df.datetime.year, df.doy),
-                 kelowna)
+df = dataframe_from_records(False, load_records('kelowna'))
+
+(var_keys, constant_keys, not_a_number_keys) =\
+    generate_variability_keys(df)
+
+# todo: put some checks here to make sure assumptions about varying
+# keys, etc. are correct!
+
+
+for (key, std) in var_keys:
+    print("%s: %f" % (key, std))
+
+n = 10000
+
+write_experiment(lambda _df: 'kelowna-reality/kelowna_%d_%04d_%03d'\
+                 % (_df.STNID, _df.datetime.year, _df.doy),
+                 df)
 
 for index in experiments.keys():
     directory = 'kelowna-%s' % index
     if not os.path.exists(directory):
-        write_experiment(lambda df: '%s/kelowna_%d_%06d' % (directory, df.STNID, df.n),
-                         experiments[index](n, kelowna))
+        write_experiment(lambda _df: '%s/kelowna_%d_%06d' % (directory, _df.STNID, _df.n),
+                         experiments[index](n, df))
