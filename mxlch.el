@@ -338,72 +338,134 @@ all analyses and rewrite output data."
 
 ;;;; Name options
 ;; NAMRUN
-(defvar mxlch-outdir "'RUN00'" "Name of output folder. Must be enclosed in \"'\"")
-(defvar mxlch-time "86400" "Simulated time in seconds.")
-(defvar mxlch-dtime "1" "Timestep in seconds.")
-(defvar mxlch-atime "60" "Time interval for statistics in seconds.")
-(defvar mxlch-atime_vert "1800" "Time interval for vertical profile statistics in seconds.")
-(defvar mxlch-h_max "3000" "Maximum height of the simulated domain in meters.")
-(defvar mxlch-latt "0" "Latitude of simulated location in degrees.
-Should be between -90 and 90 degrees, inclusive.")
-(defvar mxlch-long "0" "Longitude of simulated location in degrees.
-Must be between 0 and 360 degrees, inclusive.")
-(defvar mxlch-day "80" "Julian day of the year.
-Between 1 and 365.")
-(defvar mxlch-hour "0" "Local time at which the simulation starts in hours.
-Between 0 and 24 hours.")
+(defcustom mxlch-outdir "'RUN00'" "Name of output folder. Must be enclosed in \"'\""
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-time "86400" "Simulated time in seconds."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-dtime "1" "Timestep in seconds."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-atime "60" "Time interval for statistics in seconds."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-atime_vert "1800" "Time interval for vertical profile statistics in seconds."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-h_max "3000" "Maximum height of the simulated domain in meters."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-latt "0" "Latitude of simulated location in degrees.
+Should be between -90 and 90 degrees, inclusive."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-long "0" "Longitude of simulated location in degrees.
+Must be between 0 and 360 degrees, inclusive."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-day "80" "Julian day of the year.
+Between 1 and 365."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-hour "0" "Local time at which the simulation starts in hours.
+Between 0 and 24 hours."
+  :type 'string
+  :group 'mxlch)
 
 ;; NAMDYN
-(defvar mxlch-zi0 "200.0" "Initital boundary layer height in meters.")
-(defvar mxlch-beta "0.20" "Entrainment ratio.")
-(defvar mxlch-lenhancedentrainment ".false."
-  "If true, the entrainment is enhanced by wind shear (u_{star}).")
-(defvar mxlch-wsls "0.000" "Flow divergence factor for subsidence, in s^{-1}.")
-(defvar mxlch-lfixedlapserates ".false."
-  "If true, the (enhancing) effect of subsidence on free tropospheric gradients is omitted.")
-(defvar mxlch-lfixedtroposphere ".false."
-  "UNDOCUMENTED in pdf.")
-(defvar mxlch-wthetasmax "0.0"
-  "Maximum surface kinematic heat flux for standard flux profiles in K m s^{-1}.")
-(defvar mxlch-c_fluxes ".false."
+(defcustom mxlch-zi0 "200.0" "Initital boundary layer height in meters."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-beta "0.20" "Entrainment ratio."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-lenhancedentrainment ".false."
+  "If true, the entrainment is enhanced by wind shear (u_{star})."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-wsls "0.000" "Flow divergence factor for subsidence, in s^{-1}."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-lfixedlapserates ".false."
+  "If true, the (enhancing) effect of subsidence on free tropospheric gradients is omitted."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-lfixedtroposphere ".false."
+  "UNDOCUMENTED in pdf."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-wthetasmax "0.0"
+  "Maximum surface kinematic heat flux for standard flux profiles in K m s^{-1}."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-c_fluxes ".false."
   "If true all fluxes are constant. It is better to use the options in NAMFLUX.
 
-(also note that this replace c_wth option in the NAMELIST.")
-(defvar mxlch-gamma "0.006"
-  "Potential temperature lapse rate in the free troposphere in K m^{-1}.")
-(defvar mxlch-lgamma ".false."
+(also note that this replace c_wth option in the NAMELIST."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-gamma "0.006"
+  "Potential temperature lapse rate in the free troposphere in K m^{-1}."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-lgamma ".false."
   "A switch to apply a different lapse rate (`mxlch-gamma2') to heights above some hcrit.
 
-TODO: undocumented in PDF; I could add.")
-(defvar mxlch-hcrit "10000"
+TODO: undocumented in PDF; I could add."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-hcrit "10000"
   "When `mxlch-lgamma' is true, apply `mxlch-gamma2' when zi > `mxlch-hcrit'.
 
-TODO: undocumented in PDF: I could add.")
-(defvar mxlch-gamma2 "0.006"
+TODO: undocumented in PDF: I could add."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-gamma2 "0.006"
   "When `mxlch-lgamma' is true, apply this lapse rate when zi > hcrit.
 
-TODO: undocumented in PDF: I could add.")
-(defvar mxlch-thetam0 "295.0"
-  "Initial mixed layer potential temperature in K.")
-(defvar mxlch-dtheta0 "4"
-  "Initital potential temperature jump in K.")
-(defvar mxlch-pressure "1013.0"
-  "Air pressure in the boundary layer in hPa. TODO:fix pdf documentation with wrong units!")
-(defvar mxlch-wqsmax "0.00"
-  "Maximum surface kinematic moisture flux for standard flux profiles, in g kg^{-1} m s^{-1}.")
-(defvar mxlch-gammaq "0.0"
-  "Specific humidity lapse rate in the free troposphere in g kg^{-1} m^{-1}.")
-(defvar mxlch-qm0 "0"
-  "Initial mixed layer specific humidity in g kg^{-1}.")
-(defvar mxlch-dq0 "0"
+TODO: undocumented in PDF: I could add."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-thetam0 "295.0"
+  "Initial mixed layer potential temperature in K."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-dtheta0 "4"
+  "Initital potential temperature jump in K."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-pressure "1013.0"
+  "Air pressure in the boundary layer in hPa. TODO:fix pdf documentation with wrong units!"
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-wqsmax "0.00"
+  "Maximum surface kinematic moisture flux for standard flux profiles, in g kg^{-1} m s^{-1}."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-gammaq "0.0"
+  "Specific humidity lapse rate in the free troposphere in g kg^{-1} m^{-1}."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-qm0 "0"
+  "Initial mixed layer specific humidity in g kg^{-1}."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-dq0 "0"
   "Inititial specific humidity jump in g kg^{-1}.
 
-Must be greater than or equal to  -`mxlch-qm0'.")
-(defvar mxlch-wcsmax "0.0"
-  "Maximum surface kinematic tracer flux for standard flub proiles in ppb m s^{-1}.")
-(defvar mxlch-gammac "0.0"
-  "Tracer lapse rate in the free troposphere in ppb m^{-1}.")
-(defvar mxlch-cm0 "0.0"
+Must be greater than or equal to  -`mxlch-qm0'."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-wcsmax "0.0"
+  "Maximum surface kinematic tracer flux for standard flub proiles in ppb m s^{-1}."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-gammac "0.0"
+  "Tracer lapse rate in the free troposphere in ppb m^{-1}."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-cm0 "0.0"
   "Initital mixed layer tracer concentration in ppb.
 \(confirmed, I think, in code that this is in fact ppb and NOT ppm)
 
@@ -411,8 +473,10 @@ I think the model interprets this as carbon dioxide; see note in .f90:
 
 \"! cm0: initial carbon dioxide mixing layer value
 ! dc0: initial carbon dioxide jump
-\"")
-(defvar mxlch-dc0 "0.0"
+\""
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-dc0 "0.0"
   "Initial tracer concentration part in ppb.
 \(confirmed, I think, in code that this is in fact ppb and NOT ppm)
 
@@ -420,264 +484,472 @@ Must be greater than or equal to -`mxlch-cm0'
 
 I think the model interprets this as carbon dioxide.
 
-See note in `mxlch-cm0' docs.")
-(defvar mxlch-c_ustr ".true."
+See note in `mxlch-cm0' docs."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-c_ustr ".true."
   "If true the momentum fluxes (and friction velocity) are constant.
 
 TODO: change in code to be lc_ustr to match coding convention on logical variables?
 
 This would make a backwards incompatable change to the namelist though, which
-might not be ideal.")
-(defvar mxlch-z0 "0.03"
+might not be ideal."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-z0 "0.03"
   "Roughness length in m.
 
 TODO: Remove misleading comment in the fortran files falsly
-stating that z0 is \"initial boundary layer height\".")
+stating that z0 is \"initial boundary layer height\"."
+  :type 'string
+  :group 'mxlch)
 
-(defvar mxlch-uws0 "0"
-  "Initital surface (x-)momentum flux in m^2 s^{-2}.")
-(defvar mxlch-vws0 "0"
-  "Initial surface (y-)momentum flux in m^2 s^{-2}.")
-(defvar mxlch-gammau "0"
-  "Lapse rate of u in the free troposphere in s^{-1}.")
-(defvar mxlch-gammav "0"
-  "Lapse rate of of v in the free troposphere in s ^{-1}.")
-(defvar mxlch-um0 "0"
-  "Initital u in the mixed layer in m s^{-1}.")
-(defvar mxlch-vm0 "0"
-  "Initital v in the mixed layer in m s^{-1}.")
-(defvar mxlch-ug "0"
-  "Geostrophic wind in the x-direction in m s^{-1}.")
-(defvar mxlch-vg "0"
-  "Geostrophic wind in the y-direction in m s^{-1}.")
-(defvar mxlch-advq "0.0"
-  "Advection of specific humidity. g kg^{-1} s^{-1}.")
-(defvar mxlch-advtheta "0.0"
-  "Advection of potential temperature in K s^{-1}.")
-(defvar mxlch-ladvecFT ".false." "If true advection is also applied for free troposphere.")
-(defvar mxlch-lencroachment ".false." "Enables encroachment")
-(defvar mxlch-lscu ".false." "Enables shallow cumulus mass-flux parameterization.")
-(defvar mxlch-lrelaxdz ".false." "If true, LCL-z_i is nudged to calculated value by time-scale \tau, rather than being set to that value.")
-(defvar mxlch-tau "7200" "Time-scale for nudging transition layer depth in seconds.")
+(defcustom mxlch-uws0 "0"
+  "Initital surface (x-)momentum flux in m^2 s^{-2}."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-vws0 "0"
+  "Initial surface (y-)momentum flux in m^2 s^{-2}."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-gammau "0"
+  "Lapse rate of u in the free troposphere in s^{-1}."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-gammav "0"
+  "Lapse rate of of v in the free troposphere in s ^{-1}."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-um0 "0"
+  "Initital u in the mixed layer in m s^{-1}."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-vm0 "0"
+  "Initital v in the mixed layer in m s^{-1}."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-ug "0"
+  "Geostrophic wind in the x-direction in m s^{-1}."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-vg "0"
+  "Geostrophic wind in the y-direction in m s^{-1}."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-advq "0.0"
+  "Advection of specific humidity. g kg^{-1} s^{-1}."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-advtheta "0.0"
+  "Advection of potential temperature in K s^{-1}."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-ladvecFT ".false." "If true advection is also applied for free troposphere."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-lencroachment ".false." "Enables encroachment"
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-lscu ".false." "Enables shallow cumulus mass-flux parameterization."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-lrelaxdz ".false." "If true, LCL-z_i is nudged to calculated value by time-scale \tau, rather than being set to that value."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-tau "7200" "Time-scale for nudging transition layer depth in seconds."
+  :type 'string
+  :group 'mxlch)
 
 
 ;; NAMSURFLAYER
-(defvar mxlch-lsurfacelayer ".false." "Enable or disable surface layer.")
-(defvar mxlch-z0m "0.03" "Roughness length of momentum in m.
+(defcustom mxlch-lsurfacelayer ".false." "Enable or disable surface layer."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-z0m "0.03" "Roughness length of momentum in m.
 
-Can get good defaults from the landsoil.cpp file in CLASS.")
-(defvar mxlch-z0h "0.03" "Roughness lenth of heat in m.
+Can get good defaults from the landsoil.cpp file in CLASS."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-z0h "0.03" "Roughness lenth of heat in m.
 
-Can get good defaults from the landsoil.cpp file in CLASS.")
+Can get good defaults from the landsoil.cpp file in CLASS."
+  :type 'string
+  :group 'mxlch)
 
 ;; NAMRAD
-(defvar mxlch-lradiation ".false." "Enable or disable
+(defcustom mxlch-lradiation ".false." "Enable or disable
 radiation. If this is turned off, net surface radiation is just a
-constant.")
-(defvar mxlch-cc "0" "Amount of cloud cover; unitless between 0 and 1.")
-(defvar mxlch-S0 "1368" "Incoming shortwave solar radiation in W m^{-2}.")
-(defvar mxlch-DeltaFsw "0.0" "Absorbed radiation by e.g. aerosols (neg. value) (shortwave component). [UNDOCUMENTED]")
-(defvar mxlch-DeltaFlw "0.0" "Emitted radiation by e.g. clouds (pos. value) (longwave compoonent). [UNDOCUMENTED]")
-(defvar mxlch-Rdistr "1.0" "Distribution of absorbing aerosols (see Barbero et al., 2013)")
-(defvar mxlch-albedo "0.2" "Albedo as a fraction between 0 and 1.")
+constant."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-cc "0" "Amount of cloud cover; unitless between 0 and 1."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-S0 "1368" "Incoming shortwave solar radiation in W m^{-2}."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-DeltaFsw "0.0" "Absorbed radiation by e.g. aerosols (neg. value) (shortwave component). [UNDOCUMENTED]"
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-DeltaFlw "0.0" "Emitted radiation by e.g. clouds (pos. value) (longwave compoonent). [UNDOCUMENTED]"
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-Rdistr "1.0" "Distribution of absorbing aerosols (see Barbero et al., 2013)"
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-albedo "0.2" "Albedo as a fraction between 0 and 1."
+  :type 'string
+  :group 'mxlch)
 
 ;; NAMSURFACE
-(defvar mxlch-llandsurface ".false." "switch to use interactive landsurface")
-(defvar mxlch-Qtot "400" "Incoming energy in W m^{-2}")
-(defvar mxlch-lsea ".false." "Using a sea surface instead of land.")
-(defvar mxlch-sst "285" "Sea surface temperature in Kelvin.")
-(defvar mxlch-Ts "295.0"
+(defcustom mxlch-llandsurface ".false." "switch to use interactive landsurface"
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-Qtot "400" "Incoming energy in W m^{-2}"
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-lsea ".false." "Using a sea surface instead of land."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-sst "285" "Sea surface temperature in Kelvin."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-Ts "295.0"
   "Initial surface temperature [K].
 
 Note in MXLCH this defaults to `mxlch-thetam0', however in the
-.el interface it will always be set to this value.")
-(defvar mxlch-wwilt "0.314" "Wilting point (m^3 m^{-3}).")
-(defvar mxlch-w2 "0.420" "Volumetric water content deeper soil layer. (m^3 m^{-3})")
-(defvar mxlch-wg "0.40" "Volumetric water content top soil layer (m^3 m^{-3}).")
-(defvar mxlch-wfc "0.491" "Volumetric water content field capacity (m^3 m^{-3}).")
-(defvar mxlch-wsat "0.6" "Saturated volumetric water content ECMWF config (m^3 m^{-3}).")
-(defvar mxlch-CLa "0.083" "Clapp and Hornberger retention curve parameter a [unitless].")
-(defvar mxlch-CLb "11.4" "Clapp and Hornberger retention curve parameter b [unitless].")
-(defvar mxlch-CLc "12.0" "Clapp and Hornberger retention curve
+.el interface it will always be set to this value."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-wwilt "0.314" "Wilting point (m^3 m^{-3})."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-w2 "0.420" "Volumetric water content deeper soil layer. (m^3 m^{-3})"
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-wg "0.40" "Volumetric water content top soil layer (m^3 m^{-3})."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-wfc "0.491" "Volumetric water content field capacity (m^3 m^{-3})."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-wsat "0.6" "Saturated volumetric water content ECMWF config (m^3 m^{-3})."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-CLa "0.083" "Clapp and Hornberger retention curve parameter a [unitless]."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-CLb "11.4" "Clapp and Hornberger retention curve parameter b [unitless]."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-CLc "12.0" "Clapp and Hornberger retention curve
 parameter c [unitless] (this is parameter \"p\" in textbook, soo
-page 140).")
-(defvar mxlch-C1sat "0.342" "Coefficient force term moisture (for heat, see page 140 in textbook).")
-(defvar mxlch-C2ref "0.3" "Coefficient restore term moisture (for heat, see page 140 in textbook).")
-(defvar mxlch-gD "0.0" "VPD correction factor for rs TODO:units?. This is only used of lrsAgs is false. Also the formulation for rs doesn't make sense to me, something to check.")
-(defvar mxlch-rsmin "0.0" "Minimum resistance of transpiration (s m^{-1}).
+page 140)."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-C1sat "0.342" "Coefficient force term moisture (for heat, see page 140 in textbook)."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-C2ref "0.3" "Coefficient restore term moisture (for heat, see page 140 in textbook)."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-gD "0.0" "VPD correction factor for rs TODO:units?. This is only used of lrsAgs is false. Also the formulation for rs doesn't make sense to me, something to check."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-rsmin "0.0" "Minimum resistance of transpiration (s m^{-1}).
 
 This is only used of lrsAgs is false. Also the formulation for rs
 doesn't make sense to me, something to check. Basically if rsmin
 is 0.0, then rs will be 0.0 independent of all the other factors
-and vpd, etc.")
-(defvar mxlch-rssoilmin "0.0" "Minimum resistance of soiltranspiration [s m^{-1}].
+and vpd, etc."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-rssoilmin "0.0" "Minimum resistance of soiltranspiration [s m^{-1}].
 
-It seems like this formulation is broken: if rssoilmin is 0.0, then it will always be 0.0 independent of the other factors. look up Jarvis-Steward stomatal conudctance model.")
-(defvar mxlch-LAI "1.0" "Leaf area index [m^2 m^{-2}].")
-(defvar mxlch-cveg "1.0" "Vegetation fraction")
-(defvar mxlch-Tsoil "285" "Temperature top soil layer [K].")
-(defvar mxlch-T2 "285" "Temperature deeper soil layer [K]")
-(defvar mxlch-Wl "0.0" "Equivalent water layer depth for wet vegetation [m]")
-(defvar mxlch-Lambda "5.9" "Thermal diffusivity skin layer [W m^{-2} K^{-1}].")
-(defvar mxlch-CGsat "3.6e-6" "Saturated soil conductivity for heat [K m^{2} J^{-1}].")
-(defvar mxlch-lrsAgs ".false." "Switch to use A-gs model for surface resistances")
-(defvar mxlch-lCO2Ags ".false" "Switch to use A-gs model for CO2 flux")
-(defvar mxlch-CO2comp298 "68.5" "CO2 compensation concentration [mg m-3].
+It seems like this formulation is broken: if rssoilmin is 0.0, then it will always be 0.0 independent of the other factors. look up Jarvis-Steward stomatal conudctance model."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-LAI "1.0" "Leaf area index [m^2 m^{-2}]."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-cveg "1.0" "Vegetation fraction"
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-Tsoil "285" "Temperature top soil layer [K]."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-T2 "285" "Temperature deeper soil layer [K]"
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-Wl "0.0" "Equivalent water layer depth for wet vegetation [m]"
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-Lambda "5.9" "Thermal diffusivity skin layer [W m^{-2} K^{-1}]."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-CGsat "3.6e-6" "Saturated soil conductivity for heat [K m^{2} J^{-1}]."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-lrsAgs ".false." "Switch to use A-gs model for surface resistances"
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-lCO2Ags ".false" "Switch to use A-gs model for CO2 flux"
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-CO2comp298 "68.5" "CO2 compensation concentration [mg m-3].
 
-Matches for c3 plants in the CLASS model (see model.cpp).")
-(defvar mxlch-Q10CO2 "1.5" "function parameter to calculate CO2 compensation concentration [-]
+Matches for c3 plants in the CLASS model (see model.cpp)."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-Q10CO2 "1.5" "function parameter to calculate CO2 compensation concentration [-]
 
-Matches for c3 plants in the CLASS model (see model.cpp).")
-(defvar mxlch-gm298 "7" "mesophyill conductance at 298 K [mm s-1]
+Matches for c3 plants in the CLASS model (see model.cpp)."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-gm298 "7" "mesophyill conductance at 298 K [mm s-1]
 
-Matches for c3 plants in the CLASS model (see model.cpp).")
-(defvar mxlch-Ammax298 "2.2" "CO2 maximal primary productivity [mg m-2 s-1]
+Matches for c3 plants in the CLASS model (see model.cpp)."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-Ammax298 "2.2" "CO2 maximal primary productivity [mg m-2 s-1]
 
-Matches for c3 plants in the CLASS model (see model.cpp).")
-(defvar mxlch-Q10gm "2" "function parameter to calculate mesophyll conductance [-]
+Matches for c3 plants in the CLASS model (see model.cpp)."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-Q10gm "2" "function parameter to calculate mesophyll conductance [-]
 
-Matches for c3 plants in the CLASS model (see model.cpp).")
-(defvar mxlch-T1gm "278" "reference temperature to calculate mesophyll conductance gm [K]
+Matches for c3 plants in the CLASS model (see model.cpp)."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-T1gm "278" "reference temperature to calculate mesophyll conductance gm [K]
 
-Matches for c3 plants in the CLASS model (see model.cpp).")
-(defvar mxlch-T2gm "301" "reference temperature to calculate mesophyll conductance gm [K]
+Matches for c3 plants in the CLASS model (see model.cpp)."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-T2gm "301" "reference temperature to calculate mesophyll conductance gm [K]
 
-Matches for c3 plants in the CLASS model (see model.cpp).")
-(defvar mxlch-Q10Am "2" "function parameter to calculate maximal primary profuctivity Ammax
+Matches for c3 plants in the CLASS model (see model.cpp)."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-Q10Am "2" "function parameter to calculate maximal primary profuctivity Ammax
 
-Matches for c3 plants in the CLASS model (see model.cpp).")
-(defvar mxlch-T1Am "281" "reference temperature to calculate maximal primary profuctivity Ammax [K]
+Matches for c3 plants in the CLASS model (see model.cpp)."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-T1Am "281" "reference temperature to calculate maximal primary profuctivity Ammax [K]
 
-Matches for c3 plants in the CLASS model (see model.cpp).")
-(defvar mxlch-T2Am "311" "reference temperature to calculate maximal primary profuctivity Ammax [K]
+Matches for c3 plants in the CLASS model (see model.cpp)."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-T2Am "311" "reference temperature to calculate maximal primary profuctivity Ammax [K]
 
-Matches for c3 plants in the CLASS model (see model.cpp).")
-(defvar mxlch-f0 "0.89" "maximum value Cfrac [-]
+Matches for c3 plants in the CLASS model (see model.cpp)."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-f0 "0.89" "maximum value Cfrac [-]
 
-Matches for c3 plants in the CLASS model (see model.cpp).")
-(defvar mxlch-ad "0.07" "regression coefficient to calculate Cfrac [kPa^{-1}]
+Matches for c3 plants in the CLASS model (see model.cpp)."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-ad "0.07" "regression coefficient to calculate Cfrac [kPa^{-1}]
 
-Matches for c3 plants in the CLASS model (see model.cpp).")
-(defvar mxlch-alpha0 "0.017" "initial low light conditions [mg J-1]
+Matches for c3 plants in the CLASS model (see model.cpp)."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-alpha0 "0.017" "initial low light conditions [mg J-1]
 
-Matches for c3 plants in the CLASS model (see model.cpp).")
-(defvar mxlch-Kx "0.7" "extinction coefficient PAR [-]
+Matches for c3 plants in the CLASS model (see model.cpp)."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-Kx "0.7" "extinction coefficient PAR [-]
 
-Matches for c3 plants in the CLASS model (see model.cpp).")
-(defvar mxlch-gmin "2.5e-4" "cuticular (minimum) conductance [m s-1]
+Matches for c3 plants in the CLASS model (see model.cpp)."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-gmin "2.5e-4" "cuticular (minimum) conductance [m s-1]
 
-Matches for c3 plants in the CLASS model (see model.cpp).")
-(defvar mxlch-Cw "1.6e-3" "constant water stress correction (eq. 13 Jacobs et al. 2007) [-]")
-(defvar mxlch-wsmax "0.55" "upper reference value soil water [-]")
-(defvar mxlch-wsmin "0.005" "lower reference value soil water [-]")
-(defvar mxlch-R10 "0.23" "respiration at 10 C [mg CO2 m-2 s-1]")
-(defvar mxlch-Eact0 "53.3e3" "activation energy [53.3 kJ kmol-1]")
-(defvar mxlch-lBVOC ".false." "Enable the calculation of BVOC (isoprene, terpene) emissions.
+Matches for c3 plants in the CLASS model (see model.cpp)."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-Cw "1.6e-3" "constant water stress correction (eq. 13 Jacobs et al. 2007) [-]"
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-wsmax "0.55" "upper reference value soil water [-]"
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-wsmin "0.005" "lower reference value soil water [-]"
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-R10 "0.23" "respiration at 10 C [mg CO2 m-2 s-1]"
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-Eact0 "53.3e3" "activation energy [53.3 kJ kmol-1]"
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-lBVOC ".false." "Enable the calculation of BVOC (isoprene, terpene) emissions.
 
-UNDOCUMENTED in pdf.")
-(defvar mxlch-BaserateIso "0.0" "Base emission rate for isoprene emissions [microg m^4 h^-1].
+UNDOCUMENTED in pdf."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-BaserateIso "0.0" "Base emission rate for isoprene emissions [microg m^4 h^-1].
 
-UNDOCUMENTED in pdf.")
-(defvar mxlch-BaserateTer "0.0" "Base emission rate for terprene emissions [microg m^4 h^-1].
+UNDOCUMENTED in pdf."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-BaserateTer "0.0" "Base emission rate for terprene emissions [microg m^4 h^-1].
 
-UNDOCUMENTED in pdf.")
+UNDOCUMENTED in pdf."
+  :type 'string
+  :group 'mxlch)
 
 ;; NAMCHEM
-(defvar mxlch-lchem ".false." "Enable or disable chemistry.")
-(defvar mxlch-lwritepl ".true." "Enable the output of production and loss terms per chemical.")
-(defvar mxlch-lcomplex ".false." "Choice between complex chemical scheme and simplified scheme.")
-(defvar mxlch-ldiuvar ".true." "If false the UC radiation during day is calculated at time h.ref.")
-(defvar mxlch-h_ref "12." "Reference time for calculated UC radiation if ldiuvar is set to .false.")
-(defvar mxlch-lflux ".false." "If set to .true. the times of sunrise and sunset are input. The otpions in NAMFLUX are preferred.")
-(defvar mxlch-fluxstart "0.0" "Time of sunrise if lflux is set to .true. [hr].")
-(defvar mxlch-fluxend "0.0" "Time of sunset if lflux is set to .true. [hr].")
-(defvar mxlch-pressure_ft "1013.0"
+(defcustom mxlch-lchem ".false." "Enable or disable chemistry."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-lwritepl ".true." "Enable the output of production and loss terms per chemical."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-lcomplex ".false." "Choice between complex chemical scheme and simplified scheme."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-ldiuvar ".true." "If false the UC radiation during day is calculated at time h.ref."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-h_ref "12." "Reference time for calculated UC radiation if ldiuvar is set to .false."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-lflux ".false." "If set to .true. the times of sunrise and sunset are input. The otpions in NAMFLUX are preferred."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-fluxstart "0.0" "Time of sunrise if lflux is set to .true. [hr]."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-fluxend "0.0" "Time of sunset if lflux is set to .true. [hr]."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-pressure_ft "1013.0"
   "Defaults to pressure [hPa] in fortran code.
 
-TODO: fix pdf documentation to match units")
-(defvar mxlch-lchconst ".false."
+TODO: fix pdf documentation to match units"
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-lchconst ".false."
   "Switch to calculate reaction rates using reference
   temperatures, humidities, and pressures instead of actual
-  values.")
-(defvar mxlch-t_ref_cbl "298."
-  "Reference temperature in the boundary layer [K].")
-(defvar mxlch-p_ref_cbl "1013.5"
+  values."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-t_ref_cbl "298."
+  "Reference temperature in the boundary layer [K]."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-p_ref_cbl "1013.5"
   "Reference pressure in the boundary layer [hPa].
 
-TODO: pdf reference has the wrong default (1000.0) and wrong units.!")
-(defvar mxlch-q_ref_cbl "10.0"
+TODO: pdf reference has the wrong default (1000.0) and wrong units.!"
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-q_ref_cbl "10.0"
   "Reference specific humidity in the boundary layer [g kg-1].
 
-")
-(defvar mxlch-t_ref_ft "298."
+"
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-t_ref_ft "298."
   "Reference temeprature in the free troposphere [K].
 
-")
-(defvar mxlch-p_ref_ft "1013.5" "Reference pressure in the free
+"
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-p_ref_ft "1013.5" "Reference pressure in the free
 troposphere [hPa]
 
 I do not think tihs actually gets used, but I could be wrong..
 
-TODO: pdf reference has the wrong default (1000.0) and wrong units.!")
-(defvar mxlch-q_ref_ft "10.0"
+TODO: pdf reference has the wrong default (1000.0) and wrong units.!"
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-q_ref_ft "10.0"
   "Reference specific humidty in the
-free troposphere. [g kg-1].")
+free troposphere. [g kg-1]."
+  :type 'string
+  :group 'mxlch)
 
 ;; NAMFLUX
-(defvar mxlch-starttime_wt "sunrise"
+(defcustom mxlch-starttime_wt "sunrise"
   "Time after which the heat flux starts in the case of functions 2 and 3 [s].
 
 Note that currently this is not written to namelist, because the only way to trigger
-a sunrise startime is to not have this option in the namelist.")
-(defvar mxlch-endtime_wt "sunset"
+a sunrise startime is to not have this option in the namelist."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-endtime_wt "sunset"
   "Time after which the heat flux ends in the case of functions 2 and 3 [s].
 
 Note that currently this is not written to namelist, because the only way to trigger
-a sunrise startime is to not have this option in the namelist.")
-(defvar mxlch-offset_wt "0" "Offset for the kinematic heat flux [K m s-1].")
+a sunrise startime is to not have this option in the namelist."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-offset_wt "0" "Offset for the kinematic heat flux [K m s-1]."
+  :type 'string
+  :group 'mxlch)
 
-(defvar mxlch-starttime_wq "sunrise"
+(defcustom mxlch-starttime_wq "sunrise"
   "Time after which the moisture flux starts in the case of functions 2 and 3 [s].
 
 Note that currently this is not written to namelist, because the only way to trigger
-a sunrise startime is to not have this option in the namelist.")
-(defvar mxlch-endtime_wq "sunset"
+a sunrise startime is to not have this option in the namelist."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-endtime_wq "sunset"
   "Time after which the moisture flux ends in the case of functions 2 and 3 [s].
 
 Note that currently this is not written to namelist, because the only way to trigger
-a sunrise startime is to not have this option in the namelist.")
-(defvar mxlch-offset_wq "0" "Offset for the kinematic moisture flux [g kg-1 m s-1].")
+a sunrise startime is to not have this option in the namelist."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-offset_wq "0" "Offset for the kinematic moisture flux [g kg-1 m s-1]."
+  :type 'string
+  :group 'mxlch)
 
-(defvar mxlch-starttime_chem "sunrise"
+(defcustom mxlch-starttime_chem "sunrise"
   "Time after which the chemical emissions start in the case of
   functions 2 and 3. [s]
 
 Note that currently this is not written to namelist, because the only way to trigger
-a sunrise startime is to not have this option in the namelist.")
+a sunrise startime is to not have this option in the namelist."
+  :type 'string
+  :group 'mxlch)
 
-(defvar mxlch-endtime_chem "sunset"
+(defcustom mxlch-endtime_chem "sunset"
   "Time after which the chemical emissions end in the case of
   functions 2 and 3. [s]
 
 Note that currently this is not written to namelist, because the only way to trigger
-a sunrise startime is to not have this option in the namelist.")
+a sunrise startime is to not have this option in the namelist."
+  :type 'string
+  :group 'mxlch)
 
-(defvar mxlch-starttime_adv "sunrise"
+(defcustom mxlch-starttime_adv "sunrise"
   "Time after which the advection of potential temperature and moisture starts [s].
 
 Not sure about exclamation syntax, but the true variable name
 does not have this (are these just comments in the namelist?).
 
 Note that currently this is not written to namelist, because the only way to trigger
-a sunrise startime is to not have this option in the namelist.")
-(defvar mxlch-endtime_adv "sunset"
+a sunrise startime is to not have this option in the namelist."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-endtime_adv "sunset"
   "Time after which the advection of potential temperature and moisture ends [s].
 
 Note that currently this is not written to namelist, because the only way to trigger
-a sunrise startime is to not have this option in the namelist.")
+a sunrise startime is to not have this option in the namelist."
+  :type 'string
+  :group 'mxlch)
 
 
-(defvar mxlch-function_wt "2"
+(defcustom mxlch-function_wt "2"
   "Shape of the kinematic heat flux.
 
 0 = No flux
@@ -691,62 +963,98 @@ a sunrise startime is to not have this option in the namelist.")
 4 = Cosine shaped flux with a start and an end time. Equal to 0
 at start and end and to `mxlch-wthetasmax' in the
 middle (Standard cosine is multiplied by -`mxlch-wthetasmax'/2
-and shifted by `mxlch-wthetasmax'/2).")
+and shifted by `mxlch-wthetasmax'/2)."
+  :type 'string
+  :group 'mxlch)
 
-(defvar mxlch-function_wq "2"
-  "Shape of the kinematic moisture flux (see `mxlch-function_wt').")
+(defcustom mxlch-function_wq "2"
+  "Shape of the kinematic moisture flux (see `mxlch-function_wt')."
+  :type 'string
+  :group 'mxlch)
 
 ;; NAMSOA
 ;; all of below are undocumented, and have no defaults excelt lvbs.
-(defvar mxlch-lvbs ".false."
+(defcustom mxlch-lvbs ".false."
   "Undocumented. This defaults to .false. in fortran files. If it
   is true, the namelist must define all other variables in
-  NAMSOA (there are no defaults).")
-(defvar mxlch-low_high_NOx "1"
+  NAMSOA (there are no defaults)."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-low_high_NOx "1"
   "Undocumented in pdf, and no defaults in bulk_chemistry.f90, so
-  defauls are taken from namoptions.hyyt.")
-(defvar mxlch-alpha1_TERP_low "0.107"
+  defauls are taken from namoptions.hyyt."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-alpha1_TERP_low "0.107"
   "Undocumented in pdf, and no defaults in bulk_chemistry.f90, so
-  defauls are taken from namoptions.hyyt.")
-(defvar mxlch-alpha2_TERP_low "0.092"
+  defauls are taken from namoptions.hyyt."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-alpha2_TERP_low "0.092"
   "Undocumented in pdf, and no defaults in bulk_chemistry.f90, so
-  defauls are taken from namoptions.hyyt.")
-(defvar mxlch-alpha3_TERP_low "0.359"
+  defauls are taken from namoptions.hyyt."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-alpha3_TERP_low "0.359"
   "Undocumented in pdf, and no defaults in bulk_chemistry.f90, so
-  defauls are taken from namoptions.hyyt.")
-(defvar mxlch-alpha4_TERP_low "0.600"
+  defauls are taken from namoptions.hyyt."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-alpha4_TERP_low "0.600"
   "Undocumented in pdf, and no defaults in bulk_chemistry.f90, so
-  defauls are taken from namoptions.hyyt.")
-(defvar mxlch-alpha1_TERP_high "0.012"
+  defauls are taken from namoptions.hyyt."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-alpha1_TERP_high "0.012"
   "Undocumented in pdf, and no defaults in bulk_chemistry.f90, so
-  defauls are taken from namoptions.hyyt.")
-(defvar mxlch-alpha2_TERP_high "0.122"
+  defauls are taken from namoptions.hyyt."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-alpha2_TERP_high "0.122"
   "Undocumented in pdf, and no defaults in bulk_chemistry.f90, so
-  defauls are taken from namoptions.hyyt.")
-(defvar mxlch-alpha3_TERP_high "0.201"
+  defauls are taken from namoptions.hyyt."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-alpha3_TERP_high "0.201"
   "Undocumented in pdf, and no defaults in bulk_chemistry.f90, so
-  defauls are taken from namoptions.hyyt.")
-(defvar mxlch-alpha4_TERP_high "0.500"
+  defauls are taken from namoptions.hyyt."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-alpha4_TERP_high "0.500"
   "Undocumented in pdf, and no defaults in bulk_chemistry.f90, so
-  defauls are taken from namoptions.hyyt.")
-(defvar mxlch-alpha1_ISO_low "0.009"
+  defauls are taken from namoptions.hyyt."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-alpha1_ISO_low "0.009"
   "Undocumented in pdf, and no defaults in bulk_chemistry.f90, so
-  defauls are taken from namoptions.hyyt.")
-(defvar mxlch-alpha2_ISO_low "0.030"
+  defauls are taken from namoptions.hyyt."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-alpha2_ISO_low "0.030"
   "Undocumented in pdf, and no defaults in bulk_chemistry.f90, so
-  defauls are taken from namoptions.hyyt.")
-(defvar mxlch-alpha3_ISO_low "0.015"
+  defauls are taken from namoptions.hyyt."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-alpha3_ISO_low "0.015"
   "Undocumented in pdf, and no defaults in bulk_chemistry.f90, so
-  defauls are taken from namoptions.hyyt.")
-(defvar mxlch-alpha1_ISO_high "0.001"
+  defauls are taken from namoptions.hyyt."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-alpha1_ISO_high "0.001"
   "Undocumented in pdf, and no defaults in bulk_chemistry.f90, so
-  defauls are taken from namoptions.hyyt.")
-(defvar mxlch-alpha2_ISO_high "0.023"
+  defauls are taken from namoptions.hyyt."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-alpha2_ISO_high "0.023"
   "Undocumented in pdf, and no defaults in bulk_chemistry.f90, so
-  defauls are taken from namoptions.hyyt.")
-(defvar mxlch-alpha3_ISO_high "0.015"
+  defauls are taken from namoptions.hyyt."
+  :type 'string
+  :group 'mxlch)
+(defcustom mxlch-alpha3_ISO_high "0.015"
   "Undocumented in pdf, and no defaults in bulk_chemistry.f90, so
-  defauls are taken from namoptions.hyyt.")
+  defauls are taken from namoptions.hyyt."
+  :type 'string
+  :group 'mxlch)
 
 
 ;;;; functions for setting up and running my experiments
