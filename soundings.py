@@ -110,29 +110,39 @@ If KEYS is false, then return a dataframe of every key in records."""
     df['w_average'] = 0.5 * (df.w2 + df.wg)
     return df
 
-input_keys = ['gammatheta', 'theta', 'dtheta',\
-              'advtheta', 'gammaq', 'q', 'dq', 'advq',
-              'gammau', 'gammav', 'u', 'v', 'cc',
-              'Tsoil', 'advt_tropo', 'advq_tropo',
-              'w2', 'wg']
+
+def fraction_mode(ds):
+    """Return the fraction of observations that are equal to ds's mode
+
+This either returns the fraction (floating point), or an error"""
+    try:
+        mode = ds.mode()[0]
+    except KeyError:
+        return KeyError
+    try:
+        modecount = ds[ds == mode].size
+    except TypeError:
+        return TypeError
+    return float(modecount) / float(ds.size)
 
 
 def generate_variability_keys(df_input):
-    """Generate all keys that vary, don't vary, and are string (or other
-non-floating data) from a dataframe DF_INPUT"""
+    """Generate all keys that vary, don't vary, and are filled with None
+values (e.g., no mode for the dataseries, or cannot compare with mode)
+from a dataframe DF_INPUT
+    """
     variability_keys = c.deque()
     constant_keys = c.deque()
-    not_number_keys = c.deque()
-    for key in df_input.columns:
-        try:
-           std_dev = df_input[key].std()
-           if std_dev > (abs(0.001 * df_input[key].mean())):
-               variability_keys.append((key, std_dev))
-           else:
-               constant_keys.append(key)
-        except TypeError:
-            not_number_keys.append(key)
-    return (variability_keys, constant_keys, not_number_keys)
+    none_keys = c.deque()
+    for (label, ds) in df_input.iteritems():
+        mode_fraction = fraction_mode(ds)
+        if (mode_fraction == TypeError) or (mode_fraction == KeyError):
+            none_keys.append(label)
+        elif mode_fraction >= 0.99:
+            constant_keys.append(label)
+        else:
+            variability_keys.append(label)
+    return (set(variability_keys), set(constant_keys), set(none_keys))
 
 def load_dataframes():
     """load all station dataframes in STATION_IDS into a dict keyed by the keys in STATION_IDS"""
@@ -208,7 +218,7 @@ def runtime(tstart):
 Note simulation time finish will always be 1600 local,
 because at Kelowna this always ended at 16.049722, so we are conisstent with
 that forumulation"""
-    return (3600.0 * (16.0 - tstart))
+    return (3600.0 * (16.049722 - tstart))
 
 elisp_conversion_functions = {
     'CO2' : ppm_to_ppb,
@@ -247,6 +257,7 @@ elisp_conversion = {
     'mxlch-T2' : 'T2',
     'mxlch-Ts' : 'Ts',
     'mxlch-Tsoil' : 'Tsoil',
+    'mxlch-Wl' : 'Wl',
     'mxlch-CLa' : 'a',
     'mxlch-CLb' : 'b',
     'mxlch-CLc' : 'p',
@@ -295,9 +306,34 @@ elisp_conversion = {
     'mxlch-z0h' : 'z0h',
     'mxlch-z0m' : 'z0m',
     'mxlch-advtheta' : 'advt_tropo',
-    'mxlch-advq' : 'advq_tropo',
-
+    'mxlch-advq' : 'advq_tropo'
     }
+
+VARIABLE_ELISP_KEYS = {
+    'mxlch-LAI',
+    'mxlch-pressure',
+    'mxlch-pressure_ft',
+    'mxlch-T2',
+    'mxlch-Ts',
+    'mxlch-Tsoil',
+    'mxlch-cc',
+    'mxlch-day',
+    'mxlch-zi0',
+    'mxlch-qm0',
+    'mxlch-time',
+    'mxlch-thetam0',
+    'mxlch-hour',
+    'mxlch-um0',
+    'mxlch-vm0',
+    'mxlch-ug',
+    'mxlch-vg',
+    'mxlch-w2',
+    'mxlch-wg',
+    'mxlch-advtheta',
+    'mxlch-advq'
+}
+
+VARIABLE_PANDAS_KEYS = set(map(lambda x: elisp_conversion[x], VARIABLE_ELISP_KEYS))
 
 def elisp_print_dispatcher(key, series):
     """Print the value corresponding to elisp variable KEY in class input pandas SERIES
@@ -316,29 +352,27 @@ TODO: make constants"""
             f = lambda x : x
     return f(series[pandas_key])
 
-
 def write_variable(key, series, f):
-    """write a variable kiven a KEY to SERIES, and a filehandle F"""
+    """write a variable kiven an elisp variable KEY, and a filehandle F"""
 
     f.write("(setq %s \"%s\")\n" % (key, elisp_print_dispatcher(key, series)))
     return True
 
-def write_row(prefix_f, series):
+def write_row(prefix_f, series, elisp_keys):
     """write a row of input data given SERIES.
 
 PREFIX_F is a function that takes SERIES as argument and returns a string of a filepath
 
-e.g., lamda x: '%d_%04d_%03d' % (series.STNID, series.datetime.year, series.doy)"""
-    # checks
-    if ((series.du != 0.0) or (series.dv != 0.0)):
-        raise RuntimeWarning("du/dv is not euqal to zero so we ahve to set \
-geostrophic wind tosomethign other than mixed layer wind")
-    pwd = 'data/%s'% (prefix_f(series))
-    os.makedirs(pwd, exist_ok=True)
-    input_path = "%s/input.el" % pwd
-    if (not os.path.exists(input_path)):
-        f = open(input_path, 'w')
-        for key in elisp_conversion.keys():
+e.g., lamda x: '%d_%04d_%03d/variables.el' % (series.STNID, series.datetime.year, series.doy)
+
+ELISP_KEYS is a list of the elisp keys that we want to write to a file.
+
+"""
+    el_path = 'data/%s'% (prefix_f(series))
+    os.makedirs(os.path.dirname(el_path), exist_ok=True)
+    if (not os.path.exists(el_path)):
+        f = open(el_path, 'w')
+        for key in elisp_keys:
             write_variable(key, series, f)
         f.close()
     return True
@@ -346,17 +380,17 @@ geostrophic wind tosomethign other than mixed layer wind")
 def write_experiment(prefix_f, df):
     """write a station's input data given a PREFIX_F (see `write_row') and its dataframe DF"""
     for (i, series) in df.iterrows():
-        write_row(prefix_f, series)
+        write_row(prefix_f, series, VARIABLE_ELISP_KEYS)
     return True
-
 
 def montecarlo_randomized(n, df, randomized_columns=None):
     """Genearte N samples of DF where COLUMNS are randomized from each
 other, but all other variables have the same correlation structure as
 DF. If randomized_columns is None, all columns will be randomized."""
     random.seed(a=1)
+    df = df[VARIABLE_PANDAS_KEYS]
     if randomized_columns is None:
-        randomized_columns = df.columns
+        randomized_columns = VARIABLE_PANDAS_KEYS
     index_range = range(n)
     random_df = pd.DataFrame([df.iloc[random.randrange(df.shape[0])]
                               for _i in index_range],
@@ -375,96 +409,44 @@ def montecarlo_correlated(n, df, correlated_columns=set()):
 
     """
     return montecarlo_randomized(n, df,
-                                   randomized_columns=(set(df.columns)
+                                   randomized_columns=(VARIABLE_PANDAS_KEYS
                                                        - set(correlated_columns)))
 
-def correlated_dynamics(n, df):
+ATMOSPHERE_KEYS = {'u', 'advq_tropo', 'cc', 'q', 'tstart',
+                   'Ps', 'w_average', 'h',  'theta', 'v',
+                   'advt_tropo', 'doy'}
 
-    """generate data of where dynamics (wind speed and bl height) are
-correlated with SM and everything else is random
+LAND_KEYS = {'LAI', 'Tsoil', 'T2', 'Ts' 'w_average', 'tstart'}
 
-data are N long, and generated from DF."""
-    return montecarlo_correlated(n, df, correlated_columns={'u', 'v', 'h', 'w_average'})
-
-def correlated_lai(n, df):
-
-    """generate data of where lai is
-correlated with SM and everything else is random
-
-data are N long, and generated from DF."""
-    return montecarlo_correlated(n, df, correlated_columns={'LAI', 'w_average'})
-
-
-TEMPERATURE_KEYS = {'T2', 'Ts', 'Tsoil', 'theta',
-                    'advt_tropo', 'w_average'}
-
-def correlated_temperature(n, df):
+def correlated_land(n, df):
 
     """generate data where temeprature is
-correlated with SM and everything else is random
+correlated with land variables and everything else is random
 
 data are N long, and generated from DF."""
-    return montecarlo_correlated(n, df, correlated_columns=TEMPERATURE_KEYS)
+    return montecarlo_correlated(n, df, correlated_columns=LAND_KEYS)
 
-def correlated_moisture(n, df):
+def correlated_atmosphere(n, df):
 
     """generate data where moisture is
-correlated with SM and everything else is random
+correlated with atmosphere variables and everything else is random
 
 data are N long, and generated from DF."""
-    return montecarlo_correlated(n, df, correlated_columns=\
-                                 {'q', 'advq_tropo', 'w_average'})
-
-def correlated_doy(n, df):
-
-    """generate data where doy is
-correlated with SM and everything else is random
-
-data are N long, and generated from DF."""
-    return montecarlo_correlated(n, df, correlated_columns=\
-                                 {'doy', 'w_average'})
-
-def correlated_doy_lai_temperature(n, df):
-
-    """generate data where doy is
-correlated with SM and everything else is random
-
-data are N long, and generated from DF."""
-    return montecarlo_correlated(n, df, correlated_columns=\
-                                 TEMPERATURE_KEYS.union({'doy', 'LAI'}))
-
-def correlated_lai_temperature(n, df):
-
-    """generate data where doy is
-correlated with SM and everything else is random
-
-data are N long, and generated from DF."""
-    return montecarlo_correlated(n, df, correlated_columns=\
-                                 TEMPERATURE_KEYS.union({'LAI'}))
-
-def correlated_cc(n, df):
-
-    """generate data where cloud cover is
-correlated with SM and everything else is random
-
-data are N long, and generated from DF."""
-    return montecarlo_correlated(n, df, correlated_columns=\
-                                 {'cc', 'w_average'})
+    return montecarlo_correlated(n, df, correlated_columns=ATMOSPHERE_KEYS)
 
 def causal_experiment(n, df):
 
     """generate a data of a causal experiment N long, using DF to generate data
 
 Note that this assumes we are only interested in sampling soil mosture between
-(df.w_average.min() - df.w_average.std()) and df.w_average.max(), and it uses a
-uniform sampling
+the wilting point and saturation, and it uses a uniform sampling.
 """
     random.seed(a=1)
-    min_sm = df.w_average.min() - df.w_average.std()
-    max_sm = df.w_average.max()
+    min_sm = df.wwilt.mode()[0]
+    max_sm = df.wsat.mode()[0]
     index_range = range(n)
     random_df = \
-       montecarlo_correlated(n, df, correlated_columns=set(df.columns))
+       montecarlo_correlated(n, df, correlated_columns=VARIABLE_PANDAS_KEYS)
     random_df['w_average'] = [random.uniform(min_sm, max_sm) for _i in random_df.index]
     return random_df
 
@@ -481,37 +463,50 @@ using DF to generate data
 # dictionary of name:function of n, df for generating data
 experiments = {
     'causal' : causal_experiment,
+    'atm' : correlated_atmosphere,
+    'land' : correlated_land,
     'randomized' : randomized_experiment,
-    'dynamics' : correlated_dynamics,
-    'lai' : correlated_lai,
-    'temperature' : correlated_temperature,
-    'moisture' : correlated_moisture,
-    'doy' : correlated_doy,
-    'cc' : correlated_cc,
-    'doy-lai-temperature': correlated_doy_lai_temperature,
-    'lai-temperature': correlated_lai_temperature
     }
 
-df = dataframe_from_records(False, load_records('kelowna'))
+def input_generation(site_key):
+    """generate all input data and directory structure for SITE_KEY
 
-(var_keys, constant_keys, not_a_number_keys) =\
-    generate_variability_keys(df)
+SITE_KEY is a human name and must be a key in STATION_IDS
 
-# todo: put some checks here to make sure assumptions about varying
-# keys, etc. are correct!
+"""
+    df = dataframe_from_records(False, load_records('kelowna'))
 
+    (df_var_keys, df_constant_keys, df_none_keys) = generate_variability_keys(df)
 
-for (key, std) in var_keys:
-    print("%s: %f" % (key, std))
+    constant_keys = set(elisp_conversion.values()) - VARIABLE_PANDAS_KEYS
 
-n = 10000
+    should_be_constant = constant_keys - df_constant_keys
 
-write_experiment(lambda _df: 'kelowna-reality/kelowna_%d_%04d_%03d'\
-                 % (_df.STNID, _df.datetime.year, _df.doy),
-                 df)
+    df_mode = df.mode().iloc[0]
 
-for index in experiments.keys():
-    directory = 'kelowna-%s' % index
-    if not os.path.exists(directory):
-        write_experiment(lambda _df: '%s/kelowna_%d_%06d' % (directory, _df.STNID, _df.n),
-                         experiments[index](n, df))
+    f = open('data/%s-WARNINGS.txt' % site_key, 'w')
+    for key in should_be_constant:
+        f.write('Even though it is not constant, using mode for site-level constant variable:\n***%s***\nStd dev: %f\nFraction of obs at mode: %f\n\n' % (key, df[key].std(), fraction_mode(df[key])))
+    if (df_mode.du != 0.0):
+        f.write('du not equal to zero so we should be setting geostrophic wind to something other than mixed layer wind.\ndu: %f\n\n' % df_mode.du)
+    if (df_mode.dv != 0.0):
+        f.write('dv not equal to zero so we should be setting geostrophic wind to something other than mixed layer wind.\ndv: %f\n\n' % df_mode.dv)
+    f.close()
+
+    write_row(lambda _df: '%s-constants.el' % site_key, df_mode,
+              (set(elisp_conversion.keys()) - VARIABLE_ELISP_KEYS))
+
+    n = 10000
+
+    write_experiment(lambda _df: '%s-reality/%s_%04d_%03d/variables.el'\
+                     % (site_key, site_key, _df.datetime.year, _df.doy),
+                     df)
+
+    for index in experiments.keys():
+        directory = '%s-%s' % (site_key, index)
+        if not os.path.exists(directory):
+            write_experiment(lambda _df: '%s/%s_%06d/variables.el' % (directory, site_key, _df.n),
+                             experiments[index](n, df))
+    return True
+
+input_generation('kelowna')
