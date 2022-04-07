@@ -693,7 +693,7 @@ It seems like this formulation is broken: if rssoilmin is 0.0, then it will alwa
 (defcustom mxlch-lrsAgs ".false." "Switch to use A-gs model for surface resistances"
   :type 'string
   :group 'mxlch)
-(defcustom mxlch-lCO2Ags ".false" "Switch to use A-gs model for CO2 flux"
+(defcustom mxlch-lCO2Ags ".false." "Switch to use A-gs model for CO2 flux"
   :type 'string
   :group 'mxlch)
 (defcustom mxlch-CO2comp298 "68.5" "CO2 compensation concentration [mg m-3].

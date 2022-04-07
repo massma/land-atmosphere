@@ -474,7 +474,7 @@ def input_generation(site_key):
 SITE_KEY is a human name and must be a key in STATION_IDS
 
 """
-    df = dataframe_from_records(False, load_records('kelowna'))
+    df = dataframe_from_records(False, load_records(site_key))
 
     (df_var_keys, df_constant_keys, df_none_keys) = generate_variability_keys(df)
 
@@ -484,6 +484,7 @@ SITE_KEY is a human name and must be a key in STATION_IDS
 
     df_mode = df.mode().iloc[0]
 
+    os.makedirs('data', exist_ok=True)
     f = open('data/%s-WARNINGS.txt' % site_key, 'w')
     for key in should_be_constant:
         f.write('Even though it is not constant, using mode for site-level constant variable:\n***%s***\nStd dev: %f\nFraction of obs at mode: %f\n\n' % (key, df[key].std(), fraction_mode(df[key])))
