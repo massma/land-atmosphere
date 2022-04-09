@@ -217,8 +217,14 @@ def runtime(tstart):
 
 Note simulation time finish will always be 1600 local,
 because at Kelowna this always ended at 16.049722, so we are conisstent with
-that forumulation"""
-    return (3600.0 * (16.049722 - tstart))
+that forumulation.
+
+REDO: bump it up to 22 hrs local to get nighttime response."""
+    return '%d' % round(np.ceil((3600.0 * (22.049722 - tstart))))
+
+def print_int(value):
+    """Print an integer value, converting from float if necessary"""
+    return '%d' % round(value)
 
 elisp_conversion_functions = {
     'CO2' : ppm_to_ppb,
@@ -242,7 +248,10 @@ elisp_conversion_functions = {
     'sw_cu' : fortran_print_bool,
     'u' : set_minimum_wind,
     'v' : set_minimum_wind,
+    'doy' : print_int,
+    'dt' : print_int
     }
+
 elisp_conversion_functions_elisp_key = {
     'mxlch-time' : runtime }
 

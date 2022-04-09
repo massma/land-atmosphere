@@ -36,6 +36,9 @@ this file is!"
   :type 'string
   :group 'mxlch)
 
+(defconst mxlch-variable-input "variables.el"
+  "The filename of variable input.")
+
 
 ;;;;  Utility functions
 (defun mxlch-generate-defvar ()
@@ -114,8 +117,6 @@ this file is!"
 
 (defun mxlch-write-namelist (&optional filename)
   "Write the current state to a namelist in FILENAME."
-  ;; we migth not want this to be interactive: instead call this from the design of my simulations
-  (interactive)
   (if filename
       (find-file filename)
     (ido-file-internal ido-default-file-method))
@@ -160,15 +161,16 @@ this file is!"
   (kill-buffer))
 
 
-(defun mxlch-write-namelists (arg)
-  "Write all namelists for experiments in `mxlch-data-dir'.
+(defun mxlch-write-namelists-experiment (exp-name arg)
+  "Write out all namelists for experiment EXP-NAME.
 
-Will do nothing if a namelist already exists, unless prefix argument ARG is positive.
-
-In that case, it will overwrite the namelist."
-  (interactive "P")
-  (mxlch-set-non-default-constants)
-  (let ((inputs (directory-files-recursively mxlch-data-dir (rx  (*? anything) "input.el"))))
+If ARG is true, overwrite exisitng nameslist if it exists."
+  (let ((inputs (directory-files-recursively
+                 mxlch-data-dir
+                 (rx (literal mxlch-variable-input))
+                 nil
+                 (lambda (dir)
+                   (string-match (rx (literal exp-name) (* anything)) dir)))))
     (dolist (input inputs)
       (let ((namelist-path (concat (file-name-directory input)
                                    "namoptions")))
@@ -177,6 +179,30 @@ In that case, it will overwrite the namelist."
           (load input)
           (mxlch-write-namelist namelist-path))))
     't))
+
+(defun mxlch-experiment-name-from-path (path)
+  "Get the experiment name from PATH."
+  (string-match (rx (group (+? (not blank))) "-constants.el") path)
+  (match-string 1 path))
+
+(defun mxlch-write-namelists (arg)
+  "Write all namelists for experiments in `mxlch-data-dir'.
+
+Will do nothing if a namelist already exists,
+ unless prefix argument ARG is positive.
+
+In that case, it will overwrite the namelist."
+  (interactive "P")
+  (mxlch-set-non-default-constants)
+  (let ((constant-inputs (directory-files
+                          mxlch-data-dir
+                          nil
+                          (rx (+? (not blank)) "-constants.el"))))
+    (dolist (input constant-inputs)
+      (load (concat mxlch-data-dir "/" input))
+      (mxlch-write-namelists-experiment
+       (mxlch-experiment-name-from-path input)
+       arg))))
 
 (defun mxlch-run-models (arg)
   "Run all models for experiments in `mxlch-data-dir'.
@@ -188,7 +214,10 @@ This could be asnychronous, but we end up with too many pipes open.
 
 Would have to use a more sophisticated handler using sentinels in that case."
   (interactive "P")
-  (let ((inputs (directory-files-recursively mxlch-data-dir (rx  (*? anything) "input.el"))))
+  (let ((inputs (directory-files-recursively
+                 mxlch-data-dir
+                 (rx  (*? anything)
+                      (literal mxlch-variable-input)))))
     (dolist (input inputs)
       (let* ((default-directory  (file-name-directory input))
              (output-log (concat default-directory "/model-run.out")))
@@ -243,24 +272,30 @@ it will return \"NaN\"."
      (t (number-to-string (/ sum (float count)))))))
 
 (defun mxlch-test-extract-et ()
-  "Test the function `mxlch-extract-et'."
+  "Test the function `mxlch-extract-et'.
+
+TODO: update tests"
   (if
       (string= "nan"
           (mxlch-extract-et
            (file-name-directory
-            "/home/adam/land-atmosphere/data/reality/kelowna_71203_2010_098/input.el")))
+            (concat
+             "/home/adam/land-atmosphere/data/reality/kelowna_71203_2010_098/"
+             mxlch-variable-input))))
       'ok
     (error
      "FAILED TO PASS TEST ON:
- /home/adam/land-atmosphere/data/reality/kelowna_71203_2010_098/input.el"))
+ /home/adam/land-atmosphere/data/reality/kelowna_71203_2010_098"))
   (if (string= "274.6017542083333"
          (mxlch-extract-et
           (file-name-directory
-           "/home/adam/land-atmosphere/data/causal/kelowna_71203_000019/input.el")))
+           (concat
+            "/home/adam/land-atmosphere/data/causal/kelowna_71203_000019/"
+            mxlch-variable-input))))
       'ok
     (error
      "FAILED TO PASS TEST ON:
-/home/adam/land-atmosphere/data/causal/kelowna_71203_000019/input.el")))
+/home/adam/land-atmosphere/data/causal/kelowna_71203_000019")))
 
 (defun mxlch-run-tests ()
   "Run every test in the mxlch package."
@@ -285,7 +320,11 @@ The returned data structure will be a list of length 3:
 (defun mxlch-write-csv (dir)
   "Write a csv from all experiments in DIR."
   (let ((filename (mxlch-csv-file-name dir))
-        (inputs (directory-files-recursively dir (rx  (*? anything) "input.el"))))
+        (inputs (directory-files-recursively
+                 dir
+                 (rx  (*? anything)
+                      (literal
+                       mxlch-variable-input)))))
     (find-file filename)
     (erase-buffer)
     (insert "experiment,SM,ET
@@ -1099,6 +1138,8 @@ and shifted by `mxlch-wthetasmax'/2)."
   ;; do we want to prescribe no fluxes, or a constant prescribed flux set to *max?
   (setq mxlch-function_wt "0")
   (setq mxlch-function_wq "0")
+  (setq mxlch-atime "300")
+  (setq mxlch-atime_vert "86400")
   't)
 
 
