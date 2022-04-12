@@ -253,8 +253,8 @@ it will return \"NaN\"."
                                t)
             (numberp sum))
       (setq time (read (match-string 1)))
-      (when (and (>= time 10.0)
-                 (< time 14.0))
+      (when (and (>= time 13.0)
+                 (< time 17.0))
         (dotimes (_x 8)
           (re-search-forward (rx (* blank) (group (or "NaN" (+ (or num ?.)))))
                               (line-end-position)
@@ -310,7 +310,25 @@ The returned data structure will be a list of length 3:
   (let* ((dir (file-name-directory input))
          (et (mxlch-extract-et dir))
          (experiment-name (file-name-base (directory-file-name dir))))
-    (list experiment-name mxlch-wg et)))
+    (list experiment-name
+          mxlch-wg
+          et
+          mxlch-T2
+          mxlch-Tsoil
+          mxlch-Ts
+          mxlch-thetam0
+          mxlch-advtheta
+          mxlch-qm0
+          mxlch-advq
+          mxlch-LAI
+          mxlch-cc
+          mxlch-um0
+          mxlch-vm0
+          mxlch-zi0
+          mxlch-pressure
+          mxlch-day
+          mxlch-hour
+          mxlch-time)))
 
 
 (defun mxlch-csv-file-name (dir)
@@ -327,12 +345,14 @@ The returned data structure will be a list of length 3:
                        mxlch-variable-input)))))
     (find-file filename)
     (erase-buffer)
-    (insert "experiment,SM,ET
+    (insert "experiment,SM,ET,T2,Tsoil,Ts,theta,advtheta,q,advq,LAI,cc,u,v,h,pressure,doy,tstart,runtime,
 ")
     (dolist (input inputs)
-      (let ((values (mxlch-load-output input)))
-        (insert (format "%s,%s,%s
-" (nth 0 values) (nth 1 values) (nth 2 values)))))
+      (dolist (value (mxlch-load-output input))
+        (insert value)
+        (insert ","))
+      (insert "
+"))
     (save-buffer)
     (kill-buffer)))
 
@@ -343,7 +363,9 @@ Call `mxlch-write-csv' on every directory in `mxlch-data-dir'.
 
 This will only be called if prefix ARG is true, OR there is no existing CSV file."
   (interactive "P")
-  (let ((exp-dirs (directory-files mxlch-data-dir t (rx (not ?.) (*? anything)))))
+  (let ((exp-dirs (directory-files mxlch-data-dir
+                                   t
+                                   (rx string-start (+? (not ?.)) string-end))))
     (dolist (dir exp-dirs)
       (when (and (file-directory-p dir)
                  (or arg
