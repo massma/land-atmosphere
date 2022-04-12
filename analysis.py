@@ -49,14 +49,8 @@ def fit_models(experiments):
 
 experiment_names = ['causal',
                     'randomized',
-                    'dynamics',
-                    'lai',
-                    'temperature',
-                    'moisture',
-                    'doy',
-                    'cc',
-                    'doy-lai-temperature',
-                    'lai-temperature',
+                    'atm',
+                    'land',
                     'reality']
 
 experiments = dict([(name, {'df' : load_experiment(name)}) for name in experiment_names])
@@ -141,18 +135,11 @@ plt.show()
 hist_plot(experiments, accessor='slopes')
 plt.show()
 
-for exp in ['dynamics',
-            'lai',
-            'temperature',
-            'moisture',
-            'doy',
-            'cc']:
+for exp in experiment_names:
     hist_plot(experiments, accessor='slopes', extra_experiment=exp)
 plt.show()
 
-hist_plot(experiments, accessor='slopes', extra_experiment='lai-temperature')
-plt.show()
-# scatter_plot(experiments)
+scatter_plot(experiments)
 
 
 
