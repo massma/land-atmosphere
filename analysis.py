@@ -54,10 +54,11 @@ experiment_names = ['causal',
                     'reality']
 
 experiments = dict([(name, {'df' : load_experiment(name)}) for name in experiment_names])
-(train, TEST_DF) = train_test_split(experiments['causal']['df'], random_state=0)
-experiments['causal'] = {'df' : train}
+(TRAIN, TEST_DF) = train_test_split(experiments['causal']['df'], random_state=0)
+experiments['causal'] = {'df' : TRAIN}
 
 experiments = fit_models(experiments)
+
 
 
 def rmse(truth, prediction):
@@ -104,8 +105,8 @@ def hist_plot(experiments, accessor='biases',
               f=lambda x: x, extra_experiment=None):
     """make a histogram plot"""
     fig, ax = plt.subplots()
-    ax = sns.histplot(data=f(experiments['randomized'][accessor]),
-                      kde=True, label='randomized')
+    ax = sns.histplot(data=f(experiments['causal'][accessor]),
+                      kde=True, label='causal')
 
     if extra_experiment:
         ax = sns.histplot(data=f(experiments[extra_experiment][accessor]),
@@ -114,33 +115,75 @@ def hist_plot(experiments, accessor='biases',
     ax = sns.histplot(data=f(experiments['reality'][accessor]), kde=True, ax=ax,
                       label='naive', color='m')
     ylim = ax.get_ylim()
+    conversions = {'biases' : 'bias',
+                   'slopes' : 'slope',
+                   'rmses' : 'rmse'}
     if accessor == 'biases':
         x = experiments['causal']['bias']
         xnaive = experiments['reality']['bias']
     elif accessor == 'slopes':
         x = experiments['causal']['slope']
         xnaive = experiments['reality']['slope']
+    elif accessor == 'rmses':
+        x = experiments['causal']['rmse']
+        xnaive = experiments['reality']['rmse']
     else:
         x = np.nan
         xnaive = np.nan
+    x = experiments['causal'][conversions[accessor]]
     ax.plot(f([x, x]), ylim, label='\"truth\"')
-    ax.plot(f([xnaive, xnaive]), ylim)
+    x = experiments['reality'][conversions[accessor]]
+    ax.plot(f([x, x]), ylim)
+    if extra_experiment:
+        x = experiments[extra_experiment][conversions[accessor]]
+        ax.plot(f([x, x]), ylim)
     plt.legend()
     ax.set_xlabel(accessor)
     return
 
 hist_plot(experiments)
-plt.show()
 
 hist_plot(experiments, accessor='slopes')
-plt.show()
 
 for exp in experiment_names:
     hist_plot(experiments, accessor='slopes', extra_experiment=exp)
+    hist_plot(experiments, accessor='biases',extra_experiment=exp)
+    hist_plot(experiments, accessor='rmses',extra_experiment=exp)
+
+scatter_plot(experiments, data=TRAIN)
 plt.show()
 
-scatter_plot(experiments)
+# below is useful for testing if we are actually asumptoting to a
+# "specificaiton error" as sample size increases
 
+def fit_model(n):
+    """Fit a model to a subsample of TRAIN with sample size N
 
+Useful for testing if we are tryuly asymptoting our sampling error and estimate."""
+    sample = TRAIN.sample(n=n, replace=True, random_state=0)
+    model = LinearRegression()
+    model.fit(X=prep_x_data(sample.SM), y=sample.ET)
+    return model
+
+samples = [10, 100, 500, 1000, 2000, 4000, 5000, 6000, TRAIN.shape[0]]
+models = list(map(fit_model, samples))
+predictions = list(map(lambda m: m.predict(prep_x_data(TEST_DF.SM)), models))
+rmses = list(map(lambda p: rmse(TEST_DF.ET, p), predictions))
+biases = list(map(lambda p: bias(TEST_DF.ET, p), predictions))
+
+plt.figure()
+plt.plot(samples, [m.coef_ for m in models])
+plt.xlabel('n samples')
+plt.ylabel('slope coef')
+
+plt.figure()
+plt.plot(samples,rmses)
+plt.xlabel('n samples')
+plt.ylabel('rmse')
+
+plt.figure()
+plt.plot(samples,biases)
+plt.xlabel('n samples')
+plt.ylabel('biases')
 
 plt.show()

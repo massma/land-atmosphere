@@ -443,24 +443,6 @@ correlated with atmosphere variables and everything else is random
 data are N long, and generated from DF."""
     return montecarlo_correlated(n, df, correlated_columns=ATMOSPHERE_KEYS)
 
-def causal_experiment(n, df):
-
-    """generate a data of a causal experiment N long, using DF to generate data
-
-Note that this assumes we are only interested in sampling soil mosture between
-the wilting point and saturation, and it uses a uniform sampling.
-"""
-    random.seed(a=1)
-    min_sm = df.wwilt.mode()[0]
-    max_sm = df.wsat.mode()[0]
-    index_range = range(n)
-    random_df = \
-       montecarlo_correlated(n, df, correlated_columns=VARIABLE_PANDAS_KEYS)
-    random_df['w_average'] = [random.uniform(min_sm, max_sm) for _i in random_df.index]
-    return random_df
-
-# TODO:
-
 def randomized_experiment(n, df):
     """generate a data of a randomized synoptic data N long,
 using DF to generate data
@@ -471,11 +453,35 @@ using DF to generate data
 
 # dictionary of name:function of n, df for generating data
 experiments = {
-    'causal' : causal_experiment,
     'atm' : correlated_atmosphere,
     'land' : correlated_land,
     'randomized' : randomized_experiment,
     }
+
+def slope_experiment(_ds):
+    """Take a _ds and make a causal experiment where we reduce and increase SM by 0.01"""
+    _ds_neg = _ds.copy()
+    _ds_neg['w_average'] = _ds.w_average - 0.01
+    _ds_neg['experiment'] = -1
+    _ds_pos = _ds.copy()
+    _ds_pos['w_average'] = _ds.w_average + 0.01
+    _ds_pos['experiment'] = 1
+    _ds_out = _ds.copy()
+    _ds_out['experiment'] = 0
+    return pd.DataFrame(data=[_ds_neg, _ds_out, _ds_pos],
+                        index=pd.MultiIndex.from_product([[_ds.datetime.year],
+                                                          [_ds.doy],
+                                                          [-1, 0, 1]],
+                                                         names=['year',
+                                                                'doy',
+                                                                'experiment']))
+
+def pandas_mapappend(_df, f):
+    """Apply F to every row of _DF and concatenate the results"""
+    dfs = c.deque()
+    for (i, _ds) in _df.iterrows():
+        dfs.append(f(_ds))
+    return pd.concat(dfs)
 
 def input_generation(site_key):
     """generate all input data and directory structure for SITE_KEY
@@ -508,9 +514,9 @@ SITE_KEY is a human name and must be a key in STATION_IDS
 
     n = 10000
 
-    write_experiment(lambda _df: '%s-reality/%s_%04d_%03d/variables.el'\
-                     % (site_key, site_key, _df.datetime.year, _df.doy),
-                     df)
+    write_experiment(lambda _df: '%s-reality-slope/%s_%04d_%03d_SM%d/variables.el'\
+                     % (site_key, site_key, _df.datetime.year, _df.doy, _df.experiment),
+                     pandas_mapappend(df, slope_experiment))
 
     for index in experiments.keys():
         directory = '%s-%s' % (site_key, index)

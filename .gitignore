@@ -1,5 +1,6 @@
 *.elc
 *~
 data
+old-data
 *.out
 *.png

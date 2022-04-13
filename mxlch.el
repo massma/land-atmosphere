@@ -301,16 +301,71 @@ TODO: update tests"
   "Run every test in the mxlch package."
   (mxlch-test-extract-et))
 
+(defun mxlch-sample (exp-path)
+  "Get sample from EXP-PATH.
+
+Returns nil if EXP-PATH does not contain a sample number."
+  (if
+      (string-match (rx bos (group (+? (or ?_ alpha))) ?_ (group (+ digit)) eos)
+                    exp-path)
+      (list
+       (match-string 1 exp-path)
+       (number-to-string (string-to-number
+                          (match-string 2 exp-path))))
+    nil))
+
+(defun mxlch-year-doy-experiment (exp-path)
+  "Get year, doy, and experiment from EXP-PATH.
+
+Returns nil if EXP-PATH does not contain those data."
+  (if
+      (string-match (rx bos
+                        (group (+? (or ?_ alpha))) ?_
+                        (group (+ digit)) ?_
+                        (group (+ digit)) "_SM"
+                        (group (+ (or ?- digit)))
+                        eos)
+                    exp-path)
+      (list
+       (match-string 1 exp-path)
+       (number-to-string (string-to-number
+                          (match-string 2 exp-path)))
+       (number-to-string (string-to-number
+                          (match-string 3 exp-path)))
+       (number-to-string (string-to-number
+                          (match-string 4 exp-path))))
+    nil))
+
 (defun mxlch-load-output (input)
   "Load model output corresponding to input file INPUT.
 
 The returned data structure will be a list of length 3:
-(experiment name [string], soil moisture [string], ET [string]."
+\(experiment name [string], soil moisture [string], ET [string]."
   (load-file input)
   (let* ((dir (file-name-directory input))
          (et (mxlch-extract-et dir))
-         (experiment-name (file-name-base (directory-file-name dir))))
-    (list experiment-name
+         (base-name (file-name-base (directory-file-name dir)))
+         (maybe-sample (mxlch-sample base-name))
+         (maybe-metadata (mxlch-year-doy-experiment base-name))
+         site sample year doy experiment)
+    (cond
+     (maybe-sample (setq site (car maybe-sample))
+                   (setq sample (cadr maybe-sample))
+                   (setq year "-9999")
+                   (setq doy "-9999")
+                   (setq experiment "-9999"))
+     (maybe-metadata (setq site (car maybe-metadata))
+                     (setq year (cadr maybe-metadata))
+                     (setq doy (caddr maybe-metadata))
+                     (setq experiment (cadddr maybe-metadata))
+                     (setq sample "-9999"))
+     (t (error (format "When writing csv, could not get a sample or day of year from %s path"
+                       base-name))))
+    (list site
+          sample
+          year
+          doy
+          experiment
           mxlch-wg
           et
           mxlch-T2
@@ -345,12 +400,13 @@ The returned data structure will be a list of length 3:
                        mxlch-variable-input)))))
     (find-file filename)
     (erase-buffer)
-    (insert "experiment,SM,ET,T2,Tsoil,Ts,theta,advtheta,q,advq,LAI,cc,u,v,h,pressure,doy,tstart,runtime,
+    (insert "site,sample-n,year,doy,experiment,SM,ET,T2,Tsoil,Ts,theta,advtheta,q,advq,LAI,cc,u,v,h,pressure,day,tstart,runtime
 ")
     (dolist (input inputs)
       (dolist (value (mxlch-load-output input))
         (insert value)
         (insert ","))
+      (delete-char -1)
       (insert "
 "))
     (save-buffer)
