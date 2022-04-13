@@ -12,10 +12,6 @@ sns.set_theme()
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 
-# causal graph
-# fig 1/2: "truth vertical line" and then two histograms of decorrelaed and the naive
-# fig 2/3: same, but breaking down each experiment (might need to do mulitple pair wise figures if this gets ugly
-
 data_dir = "./data"
 
 def load_experiment(name):
@@ -26,6 +22,38 @@ def load_experiment(name):
 def prep_x_data(ds):
     """Take a dataseries DS and make it into the form needed by scikit fit."""
     return ds.to_numpy().reshape(-1, 1)
+
+def reality_diagnostics(_df):
+    """Meant to be called on groupby(['year', 'doy'])"""
+    if _df.shape[0] < 3:
+        return _df.head(n=1)
+    else:
+        df_out = _df[_df.experiment == 0].copy()
+        df_neg = _df[_df.experiment == -1].copy()
+        df_pos = _df[_df.experiment == 1].copy()
+        sm_neg = df_neg.SM.squeeze()
+        sm_0 = df_out.SM.squeeze()
+        sm_pos = df_pos.SM.squeeze()
+        et_neg = df_neg.ET.squeeze()
+        et_0 = df_out.ET.squeeze()
+        et_pos = df_pos.ET.squeeze()
+        m = LinearRegression()
+        m.fit(X=np.array([[sm_neg], [sm_0], [sm_pos]]),
+              y=np.array([et_neg, et_0, et_pos]))
+        df_out['slope'] = float(m.coef_)
+        df_out['neg_difference'] = (et_0 - et_neg) / (sm_0 - sm_neg)
+        df_out['pos_difference'] = (et_pos - et_0) / (sm_pos - sm_0)
+        df_out['et_neg'] = et_neg
+        df_out['sm_neg'] = sm_neg
+        df_out['et_pos'] = et_pos
+        df_out['sm_pos'] = sm_pos
+        return df_out
+
+reality = load_experiment('reality-slope')\
+          .groupby(['year', 'doy'])\
+          .apply(reality_diagnostics)
+
+reality = reality[~np.isnan(reality.slope)]
 
 NSAMPLE = 100
 
