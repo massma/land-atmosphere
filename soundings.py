@@ -16,7 +16,6 @@ from interface_multi import stations,stations_iterator, records_iterator,get_rec
 FORCING_PATH = os.environ['CLASS4GL_DATA'] + '/forcing/IGRA_PAIRS_20190515/'
 
 STATION_IDS = {
-    'albany' : 72518,
     'milano' : 16080,
     'spokane' : 72786,
     'lindenberg' : 10393,
@@ -427,22 +426,6 @@ ATMOSPHERE_KEYS = {'u', 'advq_tropo', 'cc', 'q', 'tstart',
 
 LAND_KEYS = {'LAI', 'Tsoil', 'T2', 'Ts' 'w_average', 'tstart'}
 
-def correlated_land(n, df):
-
-    """generate data where temeprature is
-correlated with land variables and everything else is random
-
-data are N long, and generated from DF."""
-    return montecarlo_correlated(n, df, correlated_columns=LAND_KEYS)
-
-def correlated_atmosphere(n, df):
-
-    """generate data where moisture is
-correlated with atmosphere variables and everything else is random
-
-data are N long, and generated from DF."""
-    return montecarlo_correlated(n, df, correlated_columns=ATMOSPHERE_KEYS)
-
 def randomized_experiment(n, df):
     """generate a data of a randomized synoptic data N long,
 using DF to generate data
@@ -453,8 +436,6 @@ using DF to generate data
 
 # dictionary of name:function of n, df for generating data
 experiments = {
-    'atm' : correlated_atmosphere,
-    'land' : correlated_land,
     'randomized' : randomized_experiment,
     }
 
@@ -525,4 +506,6 @@ SITE_KEY is a human name and must be a key in STATION_IDS
                              experiments[index](n, df))
     return True
 
-input_generation('kelowna')
+for site in STATION_IDS.keys():
+    print('*****Working on %s***\n' % site)
+    input_generation(site)
