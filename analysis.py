@@ -11,6 +11,8 @@ sns.set_theme()
 
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
+from sklearn.cluster import KMeans
+
 
 data_dir = "./data"
 
@@ -55,10 +57,82 @@ REALITY = load_experiment('reality-slope')\
 
 REALITY = REALITY[~np.isnan(REALITY.slope)]
 
-NSAMPLE = 100
+NSAMPLE = 100 # for bootstrap
+
+# causal effect functions
+
+ATM_KEYS = {'theta', 'advtheta', 'q', 'advq', 'cc', 'u', 'v', 'h', 'pressure', 'day'}
+LAND_KEYS = {'T2', 'Tsoil', 'Ts', 'LAI'}
+CONTROL_KEYS = ATM_KEYS.union(LAND_KEYS)
+CAUSAL_CONTROLS = {'atm', 'land', 'all'}
+
+def rank_key(key):
+    """return the rank key from a standard key"""
+    return '%s_rank' % key
+
+def rank_prep(_df):
+    """Step 1 in my causal analysis: rank each variable"""
+    for key in CONTROL_KEYS:
+        _df[rank_key(key)] = _df[key].rank()
+    return _df
+
+POINTS_PER_CLUSTER = 50
+def classify(_df, keys, classification_key):
+    """Classify each point in _DF based on rank values cooresponding to
+    KEY, and assign classification to CLASSIFICATION_KEY
+    """
+    n_clusters = np.int(np.floor(float(_df.shape[0]) / float(POINTS_PER_CLUSTER)))
+    max_iter=1000
+    model = KMeans(n_clusters=n_clusters, max_iter=max_iter, algorithm="full",
+                   random_state=0)
+    xs = _df[list(map(rank_key, keys))].values
+    model.fit(xs)
+    if model.n_iter_ == max_iter:
+        raise Exception('ERORR: max iterations reached when iftting model on %s' % classification_key)
+    _df[classification_key] = model.predict(xs)
+    return _df
+
+def assign_clusters(_df):
+    """Add all clusters to _DF"""
+    _df = classify(_df, ATM_KEYS, 'atm_cluster')
+    _df = classify(_df, LAND_KEYS, 'land_cluster')
+    _df = classify(_df, CONTROL_KEYS, 'all_cluster')
+    return _df
+
+def model_cluster(_df):
+    """intended to be called on groupby, fit linear model on _DF and return slope and count"""
+    m = LinearRegression()
+    m.fit(X=prep_x_data(_df.SM), y=_df.ET)
+    return pd.Series({'slope' : np.float(m.coef_),
+                      'count' : np.float(_df.shape[0])})
+
+
+def calculate_effect(grouped):
+    """Calulcate causal effect from GROUPED: a dataframe of slopes and counts"""
+    return (grouped['slope'] * grouped['count']).sum()/grouped['count'].sum()
+
+def prep_effect(_df):
+    """Perform the first 2 steps in my causal estimation method:
+
+1. Rank each confounder we're adjusting for.
+2. Assign each point a cluster based on rankings ("match").
+"""
+    return assign_clusters(rank_prep(_df))
+
+def estimate_effect(_df, confounder_set):
+    """Perform last 2 steps in my causal estimatation method:
+
+3. Group by each cluster and calcualte a slope.
+4. Calculate the average slope, weighted by the number of points in each cluster.
+"""
+    if confounder_set not in CAUSAL_CONTROLS:
+        raise ValueError('ERROR: estimate_effect called with an \
+ unknown or unimplemented confounder set: %s' % confounder_set)
+    return calculate_effect(_df.groupby('%s_cluster' % confounder_set)\
+                            .apply(model_cluster))
 
 def fit_models(experiments):
-    """load experiment and fit model for experiment NAME"""
+    """fit models and calculate slopes for all EXPERIMENTS"""
     for (model_string, d) in experiments.items():
         samples = [d['df'].sample(n=REALITY.shape[0],
                                   replace=True,
@@ -72,9 +146,20 @@ def fit_models(experiments):
         d['samples'] = samples
         d['models'] = models
         d['model'] = model
+        d['slope'] = model.coef_
+        d['slopes'] = np.array([float(m.coef_) for m in models])
         if model_string == 'reality':
+            d['df'] = prep_effect(d['df'])
+            d['samples'] = [prep_effect(_df) for _df in d['samples']]
             d['true-slope'] = d['df'].slope.mean()
             d['true-slopes'] = np.array([x.slope.mean() for x in samples])
+    d = experiments['reality']
+    for key in CAUSAL_CONTROLS:
+        experiments['%s_effect' % key] =\
+            { 'slope' : estimate_effect(d['df'], key),
+              'slopes' : np.array([estimate_effect(_df, key)
+                                   for _df in d['samples']])}
+
     return experiments
 
 
@@ -101,8 +186,6 @@ def model_diagnostics(experiments):
 
 Mutates each dictionary in EXPERIMENTS, adding slope and slopes."""
     for (model_string, d) in experiments.items():
-        d['slope'] = float(d['model'].coef_)
-        d['slopes'] = np.array([float(m.coef_) for m in d['models']])
         d['mean-slope'] = np.average(d['slopes'])
         d['std-slope'] = np.std(d['slopes'])
         cross=np.array([estimate - truth
@@ -120,7 +203,10 @@ def scatter_plot(experiments, experiment='randomized', title=''):
     ax = facet.ax
     xlim = np.array(ax.get_xlim()).reshape(-1, 1)
     for (name, d) in experiments.items():
-        ax.plot(np.squeeze(xlim), np.squeeze(d['model'].predict(xlim)), label=name)
+        try:
+            ax.plot(np.squeeze(xlim), np.squeeze(d['model'].predict(xlim)), label=name)
+        except KeyError: # causal estimtes don't have a model; just a slope
+            'okay'
     mean_slope = experiments['reality']['true-slope']
     f = lambda x: experiments[experiment]['model'].intercept_ + mean_slope * x
     ax.plot(np.squeeze(xlim), list(map(f, np.squeeze(xlim))), label='truth')
@@ -137,7 +223,8 @@ def box_plot(experiments):
         _df = pd.DataFrame(d['slopes'], columns=['dET/dSM'])
         _df['name'] = name
         dfs.append(_df)
-    _df = pd.DataFrame(d['true-slopes'], columns=['dET/dSM'])
+    _df = pd.DataFrame(experiments['reality']['true-slopes'],
+                       columns=['dET/dSM'])
     _df['name'] = 'truth'
     dfs.append(_df)
     df = pd.concat(dfs, ignore_index=True)
@@ -149,4 +236,5 @@ def box_plot(experiments):
 box_plot(experiments)
 
 scatter_plot(experiments)
+
 plt.show()
