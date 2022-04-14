@@ -74,7 +74,7 @@ def fit_models(experiments):
         d['model'] = model
         if model_string == 'reality':
             d['true-slope'] = d['df'].slope.mean()
-            d['true-slopes'] = [x.slope.mean() for x in samples]
+            d['true-slopes'] = np.array([x.slope.mean() for x in samples])
     return experiments
 
 
@@ -102,7 +102,14 @@ def model_diagnostics(experiments):
 Mutates each dictionary in EXPERIMENTS, adding slope and slopes."""
     for (model_string, d) in experiments.items():
         d['slope'] = float(d['model'].coef_)
-        d['slopes'] = [float(m.coef_) for m in d['models']]
+        d['slopes'] = np.array([float(m.coef_) for m in d['models']])
+        d['mean-slope'] = np.average(d['slopes'])
+        d['std-slope'] = np.std(d['slopes'])
+        cross=np.array([estimate - truth
+                        for estimate in d['slopes']
+                        for truth in experiments['reality']['true-slopes']])
+        d['mean-bias'] = np.average(cross)
+        d['std-bias'] = np.std(cross)
     return experiments
 
 experiments = model_diagnostics(experiments)
@@ -135,7 +142,6 @@ def box_plot(experiments):
     dfs.append(_df)
     df = pd.concat(dfs, ignore_index=True)
     ax = sns.boxplot(x='name', y='dET/dSM', data=df)
-    plt.legend()
     ax.set_ylabel('dET/dSM (slope)')
     ax.set_xlabel('Experiment')
     return
