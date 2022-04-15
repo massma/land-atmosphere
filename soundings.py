@@ -13,31 +13,47 @@ sys.path.append(os.environ['CLASS4GL'])
 
 from interface_multi import stations,stations_iterator, records_iterator,get_record_yaml,get_records
 
+def select_sites(n):
+    """select the sites that have more than N data available.
+
+For translating site IDS into human readable names, see:
+
+/home/adam/org/doc/igra2-station-list.txt
+"""
+    path = os.environ['CLASS4GL_DATA'] + '/forcing/IGRA_PAIRS_20190515/'
+    path_output = os.environ['CLASS4GL_DATA'] + '/experiments/IGRA_PAIRS_20190515/BASE/'
+    all_stations = stations(path, suffix='ini', refetch_stations=False)
+    all_stations_select = pd.DataFrame(all_stations.table)
+    records = get_records(all_stations_select,\
+                          path,\
+                          subset='ini',\
+                          refetch_records=False,\
+                          )
+
+    grouped = records.groupby(level='STNID').apply(lambda _df: _df.shape[0])
+
+    subset = grouped[grouped >= n]
+    return subset
+
 FORCING_PATH = os.environ['CLASS4GL_DATA'] + '/forcing/IGRA_PAIRS_20190515/'
 
+# below are all sites with >= 500 records (e.g., select_sites(500)
 STATION_IDS = {
     'milano' : 16080,
+    'idar_oberstein' : 10618, # west germany  (near luxemborg/belgium
+    'lindenberg' : 10393, # germany, near berlin by coodinates
+    'elko' : 72582, # NV
+    'riverton': 917, # WY
     'spokane' : 72786,
-    'lindenberg' : 10393,
-    'idar_oberstein' : 10618,
-    'kelowna' : 71203,
-    'bergen' : 10238,
-    'prince_george' : 71908,
+    'bergen' : 10238, # northern germany near hamberg
+    'great_falls': 842, # MT
+    'kelowna' : 71203, # BC
+    'flagstaff' : 72376
+    'las_vegas' : 72388
     'quad_city' : 74455,
-    'aberdeen' : 72659,
-    'norman' : 72357,
-    'shreveport' : 72248,
-    'chanhassen' : 72649,
-    'edwards' : 72381,
-    'lincoln' : 74560,
-    'gaylord' : 72634,
-    'phoenix' : 74626,
-    'sterling' : 72403,
-    'greensboro' : 72317,
-    'birmingham' : 72230,
-    'peachtree' : 72215,
-    'pittsburgh' : 72520,
     }
+
+
 
 def generic_path(station_name, suffix='yaml'):
     """Generate a path given a STATION_NAME and SUFFIX (e.g., yaml or pkl)."""
