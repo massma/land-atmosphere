@@ -439,7 +439,9 @@ Currently, this invovles:
 4. `mxlch-write-all-csvs'.
 
 Basically, call this function with a prefix argument if you want to rerun
-all analyses and rewrite output data."
+all analyses and rewrite output data.
+
+But be wary, this will grab and lock up your emacs."
   (interactive "P")
   (let ((default-directory mxlch-repo-dir))
     (call-process "python3"

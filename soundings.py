@@ -40,7 +40,7 @@ FORCING_PATH = os.environ['CLASS4GL_DATA'] + '/forcing/IGRA_PAIRS_20190515/'
 # below are all sites with >= 500 records (e.g., select_sites(500)
 STATION_IDS = {
     'milano' : 16080,
-    'idar_oberstein' : 10618, # west germany  (near luxemborg/belgium
+    'idar_oberstein' : 10618, # west germany  (near luxemborg/belgium)
     'lindenberg' : 10393, # germany, near berlin by coodinates
     'elko' : 72582, # NV
     'riverton': 917, # WY
@@ -48,11 +48,10 @@ STATION_IDS = {
     'bergen' : 10238, # northern germany near hamberg
     'great_falls': 842, # MT
     'kelowna' : 71203, # BC
-    'flagstaff' : 72376
-    'las_vegas' : 72388
+    'flagstaff' : 72376,
+    'las_vegas' : 72388,
     'quad_city' : 74455,
     }
-
 
 
 def generic_path(station_name, suffix='yaml'):
