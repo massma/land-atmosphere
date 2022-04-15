@@ -251,4 +251,11 @@ As a side effect, may write a pickle file to data/SITE.pkl"""
 
     return True
 
-site_analysis('kelowna')
+
+f = open('%s/stations.pkl' % data_dir, 'rb')
+# stations is a dictionary of {human readable site name : igra station ids}
+stations = pickle.load(f)
+f.close()
+
+for site in stations.keys():
+    site_analysis(site)

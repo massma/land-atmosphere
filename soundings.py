@@ -13,6 +13,8 @@ sys.path.append(os.environ['CLASS4GL'])
 
 from interface_multi import stations,stations_iterator, records_iterator,get_record_yaml,get_records
 
+data_dir = "./data"
+
 def select_sites(n):
     """select the sites that have more than N data available.
 
@@ -524,3 +526,7 @@ SITE_KEY is a human name and must be a key in STATION_IDS
 for site in STATION_IDS.keys():
     print('*****Working on %s***\n' % site)
     input_generation(site)
+
+f = open('%s/stations.pkl' % data_dir, 'wb')
+pickle.dump(STATION_IDS, f)
+f.close()
