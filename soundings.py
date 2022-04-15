@@ -43,10 +43,10 @@ STATION_IDS = {
     'idar_oberstein' : 10618, # west germany  (near luxemborg/belgium)
     'lindenberg' : 10393, # germany, near berlin by coodinates
     'elko' : 72582, # NV
-    'riverton': 917, # WY
+    'riverton': 72672, # WY
     'spokane' : 72786,
     'bergen' : 10238, # northern germany near hamberg
-    'great_falls': 842, # MT
+    'great_falls': 72776, # MT
     'kelowna' : 71203, # BC
     'flagstaff' : 72376,
     'las_vegas' : 72388,

@@ -16,9 +16,9 @@ from sklearn.cluster import KMeans
 
 data_dir = "./data"
 
-def load_experiment(name):
-    """Load experiment NAME."""
-    df = pd.read_csv("%s/kelowna-%s.csv" % (data_dir, name))
+def load_experiment(site, name):
+    """Load experiment cooresponding to SITE and NAME."""
+    df = pd.read_csv("%s/%s-%s.csv" % (data_dir, site, name))
     return df[~np.isnan(df.ET)]
 
 def prep_x_data(ds):
@@ -51,15 +51,8 @@ def reality_diagnostics(_df):
         df_out['sm_pos'] = sm_pos
         return df_out
 
-REALITY = load_experiment('reality-slope')\
-          .groupby(['year', 'doy'])\
-          .apply(reality_diagnostics)
-
-REALITY = REALITY[~np.isnan(REALITY.slope)]
 
 NSAMPLE = 100 # for bootstrap
-
-# causal effect functions
 
 ATM_KEYS = {'theta', 'advtheta', 'q', 'advq', 'cc', 'u', 'v', 'h', 'pressure', 'day'}
 LAND_KEYS = {'T2', 'Tsoil', 'Ts', 'LAI'}
@@ -76,7 +69,9 @@ def rank_prep(_df):
         _df[rank_key(key)] = _df[key].rank()
     return _df
 
+# average number of points we want per a cluster
 POINTS_PER_CLUSTER = 50
+
 def classify(_df, keys, classification_key):
     """Classify each point in _DF based on rank values cooresponding to
     KEY, and assign classification to CLASSIFICATION_KEY
@@ -106,7 +101,6 @@ def model_cluster(_df):
     return pd.Series({'slope' : np.float(m.coef_),
                       'count' : np.float(_df.shape[0])})
 
-
 def calculate_effect(grouped):
     """Calulcate causal effect from GROUPED: a dataframe of slopes and counts"""
     return (grouped['slope'] * grouped['count']).sum()/grouped['count'].sum()
@@ -134,7 +128,8 @@ def estimate_effect(_df, confounder_set):
 def fit_models(experiments):
     """fit models and calculate slopes for all EXPERIMENTS"""
     for (model_string, d) in experiments.items():
-        samples = [d['df'].sample(n=REALITY.shape[0],
+        n_samples = experiments['reality']['df'].shape[0]
+        samples = [d['df'].sample(n=n_samples,
                                   replace=True,
                                   random_state=i)
                    for i in range(NSAMPLE)]
@@ -163,16 +158,6 @@ def fit_models(experiments):
     return experiments
 
 
-experiment_names = ['randomized',
-                    'atm',
-                    'land']
-
-experiments = dict([(name, {'df' : load_experiment(name)}) for name in experiment_names])
-
-experiments['reality'] = {'df' : REALITY}
-
-experiments = fit_models(experiments)
-
 def rmse(truth, prediction):
     """Return the RMSE between TRUTH (dataseries) and PREDICTION (np array)"""
     return np.sqrt(np.average((prediction-prep_x_data(truth))**2))
@@ -194,8 +179,6 @@ Mutates each dictionary in EXPERIMENTS, adding slope and slopes."""
         d['mean-bias'] = np.average(cross)
         d['std-bias'] = np.std(cross)
     return experiments
-
-experiments = model_diagnostics(experiments)
 
 def scatter_plot(experiments, experiment='randomized', title=''):
     """return a scatter plot of DATA with regression fits overlaid"""
@@ -233,8 +216,39 @@ def box_plot(experiments):
     ax.set_xlabel('Experiment')
     return
 
-box_plot(experiments)
+def site_analysis(site):
+    """Execute all analysis on SITE
 
-scatter_plot(experiments)
+As a side effect, may write a pickle file to data/SITE.pkl"""
+    pkl_path = '%s/%s.pkl' % (data_dir, site)
+    if os.path.exists(pkl_path):
+        f = open(pkl_path, 'rb')
+        experiments = pickle.load(f)
+        f.close()
+    else:
+        reality = load_experiment(site, 'reality-slope')\
+                  .groupby(['year', 'doy'])\
+                  .apply(reality_diagnostics)
+        reality = reality[~np.isnan(reality.slope)]
+        experiment_names = ['randomized',
+                            'atm',
+                            'land']
+        experiments = dict([(name, {'df' : load_experiment(site, name)})
+                            for name in experiment_names])
 
-plt.show()
+        experiments['reality'] = {'df' : reality}
+
+        experiments = fit_models(experiments)
+        experiments = model_diagnostics(experiments)
+
+        f = open(pkl_path, 'wb')
+        pickle.dump(experiments, f)
+        f.close()
+
+    box_plot(experiments)
+    scatter_plot(experiments)
+    plt.show()
+
+    return True
+
+site_analysis('kelowna')
