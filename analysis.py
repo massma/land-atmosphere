@@ -13,13 +13,12 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from sklearn.cluster import KMeans
 
-
 data_dir = "./data"
 
 def load_experiment(site, name):
     """Load experiment cooresponding to SITE and NAME."""
     df = pd.read_csv("%s/%s-%s.csv" % (data_dir, site, name))
-    return df[~np.isnan(df.ET)]
+    return df[(~np.isnan(df.ET)) & (df.ET <= 1000.0) & (df.ET >= 0.0)]
 
 def prep_x_data(ds):
     """Take a dataseries DS and make it into the form needed by scikit fit."""
@@ -52,12 +51,19 @@ def reality_diagnostics(_df):
         return df_out
 
 
-NSAMPLE = 100 # for bootstrap
+NSAMPLE = 50 # for bootstrap
 
 ATM_KEYS = {'theta', 'advtheta', 'q', 'advq', 'cc', 'u', 'v', 'h', 'pressure', 'day'}
-LAND_KEYS = {'T2', 'Tsoil', 'Ts', 'LAI'}
+LAND_KEYS = {'T2', 'Tsoil', 'Ts', 'LAI'} # should we include SM here?
+                                         # it taints the idea of
+                                         # matching, but makes sense
+                                         # with the idea of piecewise
+                                         # linear
 CONTROL_KEYS = ATM_KEYS.union(LAND_KEYS)
-CAUSAL_CONTROLS = {'atm', 'land', 'all'}
+CAUSAL_CONTROLS = {'all' : CONTROL_KEYS}
+# {'atm' : ATM_KEYS,
+#  'land': LAND_KEYS,
+#  'all' :CONTROL_KEYS}
 
 def rank_key(key):
     """return the rank key from a standard key"""
@@ -89,9 +95,8 @@ def classify(_df, keys, classification_key):
 
 def assign_clusters(_df):
     """Add all clusters to _DF"""
-    _df = classify(_df, ATM_KEYS, 'atm_cluster')
-    _df = classify(_df, LAND_KEYS, 'land_cluster')
-    _df = classify(_df, CONTROL_KEYS, 'all_cluster')
+    for (key, control_keys) in CAUSAL_CONTROLS.items():
+        _df = classify(_df, control_keys, '%s_cluster' % key)
     return _df
 
 def model_cluster(_df):
@@ -119,7 +124,7 @@ def estimate_effect(_df, confounder_set):
 3. Group by each cluster and calcualte a slope.
 4. Calculate the average slope, weighted by the number of points in each cluster.
 """
-    if confounder_set not in CAUSAL_CONTROLS:
+    if confounder_set not in CAUSAL_CONTROLS.keys():
         raise ValueError('ERROR: estimate_effect called with an \
  unknown or unimplemented confounder set: %s' % confounder_set)
     return calculate_effect(_df.groupby('%s_cluster' % confounder_set)\
@@ -149,7 +154,7 @@ def fit_models(experiments):
             d['true-slope'] = d['df'].slope.mean()
             d['true-slopes'] = np.array([x.slope.mean() for x in samples])
     d = experiments['reality']
-    for key in CAUSAL_CONTROLS:
+    for key in CAUSAL_CONTROLS.keys():
         experiments['%s_effect' % key] =\
             { 'slope' : estimate_effect(d['df'], key),
               'slopes' : np.array([estimate_effect(_df, key)
@@ -198,7 +203,7 @@ def scatter_plot(experiments, experiment='randomized', title=''):
     return
 
 
-def box_plot(experiments):
+def box_plot(experiments, title=''):
     """make a histogram plot"""
     fig, ax = plt.subplots()
     dfs = c.deque()
@@ -214,25 +219,33 @@ def box_plot(experiments):
     ax = sns.boxplot(x='name', y='dET/dSM', data=df)
     ax.set_ylabel('dET/dSM (slope)')
     ax.set_xlabel('Experiment')
+    plt.title(title)
     return
+
+def pkl_path(site):
+    """Return the path to a pickle file for SITE"""
+    return '%s/%s.pkl' % (data_dir, site)
+
+def load_pickled_experiments(site):
+    """Load pickled experiments for SITE"""
+    f = open(pkl_path(site), 'rb')
+    experiments = pickle.load(f)
+    f.close()
+    return experiments
 
 def site_analysis(site):
     """Execute all analysis on SITE
 
 As a side effect, may write a pickle file to data/SITE.pkl"""
-    pkl_path = '%s/%s.pkl' % (data_dir, site)
-    if os.path.exists(pkl_path):
-        f = open(pkl_path, 'rb')
-        experiments = pickle.load(f)
-        f.close()
+
+    if os.path.exists(pkl_path(site)):
+        experiments = load_pickled_experiments(site)
     else:
         reality = load_experiment(site, 'reality-slope')\
                   .groupby(['year', 'doy'])\
                   .apply(reality_diagnostics)
         reality = reality[~np.isnan(reality.slope)]
-        experiment_names = ['randomized',
-                            'atm',
-                            'land']
+        experiment_names = ['randomized']
         experiments = dict([(name, {'df' : load_experiment(site, name)})
                             for name in experiment_names])
 
@@ -241,15 +254,14 @@ As a side effect, may write a pickle file to data/SITE.pkl"""
         experiments = fit_models(experiments)
         experiments = model_diagnostics(experiments)
 
-        f = open(pkl_path, 'wb')
+        f = open(pkl_path(site), 'wb')
         pickle.dump(experiments, f)
         f.close()
 
-    box_plot(experiments)
-    scatter_plot(experiments)
-    plt.show()
+    box_plot(experiments, site)
+    scatter_plot(experiments, experiment='reality', title=site)
 
-    return True
+    return experiments
 
 
 f = open('%s/stations.pkl' % data_dir, 'rb')
@@ -257,5 +269,12 @@ f = open('%s/stations.pkl' % data_dir, 'rb')
 stations = pickle.load(f)
 f.close()
 
+sites = dict()
+CLEAN_SITES = True
 for site in stations.keys():
-    site_analysis(site)
+    if CLEAN_SITES and os.path.exists(pkl_path(site)):
+        os.remove(pkl_path(site))
+    print('Working on %s\n' % site)
+    sites[site] = site_analysis(site)
+
+plt.show()
