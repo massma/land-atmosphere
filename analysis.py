@@ -24,7 +24,7 @@ def prep_x_data(ds):
     """Take a dataseries DS and make it into the form needed by scikit fit."""
     return ds.to_numpy().reshape(-1, 1)
 
-def reality_diagnostics(_df):
+def true_slope(_df):
     """Meant to be called on groupby(['year', 'doy'])"""
     if _df.shape[0] < 3:
         return _df.head(n=1)
@@ -60,10 +60,6 @@ LAND_KEYS = {'T2', 'Tsoil', 'Ts', 'LAI'} # should we include SM here?
                                          # with the idea of piecewise
                                          # linear
 CONTROL_KEYS = ATM_KEYS.union(LAND_KEYS)
-CAUSAL_CONTROLS = {'all' : CONTROL_KEYS}
-# {'atm' : ATM_KEYS,
-#  'land': LAND_KEYS,
-#  'all' :CONTROL_KEYS}
 
 def rank_key(key):
     """return the rank key from a standard key"""
@@ -95,8 +91,7 @@ def classify(_df, keys, classification_key):
 
 def assign_clusters(_df):
     """Add all clusters to _DF"""
-    for (key, control_keys) in CAUSAL_CONTROLS.items():
-        _df = classify(_df, control_keys, '%s_cluster' % key)
+    _df = classify(_df, CONTROL_KEYS, 'cluster')
     return _df
 
 def model_cluster(_df):
@@ -118,49 +113,48 @@ def prep_effect(_df):
 """
     return assign_clusters(rank_prep(_df))
 
-def estimate_effect(_df, confounder_set):
+def estimate_effect(_df):
     """Perform last 2 steps in my causal estimatation method:
 
 3. Group by each cluster and calcualte a slope.
 4. Calculate the average slope, weighted by the number of points in each cluster.
 """
-    if confounder_set not in CAUSAL_CONTROLS.keys():
-        raise ValueError('ERROR: estimate_effect called with an \
- unknown or unimplemented confounder set: %s' % confounder_set)
-    return calculate_effect(_df.groupby('%s_cluster' % confounder_set)\
+    return calculate_effect(_df.groupby('cluster')\
                             .apply(model_cluster))
 
-def fit_models(experiments):
-    """fit models and calculate slopes for all EXPERIMENTS"""
-    for (model_string, d) in experiments.items():
-        n_samples = experiments['reality']['df'].shape[0]
-        samples = [d['df'].sample(n=n_samples,
-                                  replace=True,
-                                  random_state=i)
-                   for i in range(NSAMPLE)]
-        models = [LinearRegression() for i in range(NSAMPLE)]
-        for m,df in zip(models,samples):
-            m.fit(X=prep_x_data(df.SM), y=df.ET)
-        model = LinearRegression()
-        model.fit(X=prep_x_data(d['df'].SM), y=d['df'].ET)
-        d['samples'] = samples
-        d['models'] = models
-        d['model'] = model
-        d['slope'] = model.coef_
-        d['slopes'] = np.array([float(m.coef_) for m in models])
-        if model_string == 'reality':
-            d['df'] = prep_effect(d['df'])
-            d['samples'] = [prep_effect(_df) for _df in d['samples']]
-            d['true-slope'] = d['df'].slope.mean()
-            d['true-slopes'] = np.array([x.slope.mean() for x in samples])
-    d = experiments['reality']
-    for key in CAUSAL_CONTROLS.keys():
-        experiments['%s_effect' % key] =\
-            { 'slope' : estimate_effect(d['df'], key),
-              'slopes' : np.array([estimate_effect(_df, key)
-                                   for _df in d['samples']])}
+def fit_models(d):
+    """fit models and calculate slopes for D.
 
-    return experiments
+D is a dictionary with a 'df' key. D will be mutated
+along the way, adding slopes, etc."""
+    _df = d['df'].groupby(['year', 'doy']).apply(true_slope)
+    _df = _df[~np.isnan(_df.slope)]
+    d['df'] = _df
+    samples = [d['df'].sample(n=d['df'].shape[0],
+                              replace=True,
+                              random_state=i)
+               for i in range(NSAMPLE)]
+    models = [LinearRegression() for i in range(NSAMPLE)]
+    for m,df in zip(models,samples):
+        m.fit(X=prep_x_data(df.SM), y=df.ET)
+    model = LinearRegression()
+    model.fit(X=prep_x_data(d['df'].SM), y=d['df'].ET)
+    d['samples'] = samples
+    d['models'] = models
+    d['model'] = model
+    d['naive_slope'] = model.coef_
+    d['naive_slopes'] = np.array([float(m.coef_) for m in models])
+
+    d['df'] = prep_effect(_df)
+    d['samples'] = [prep_effect(_df) for _df in d['samples']]
+    d['true_slope'] = d['df'].slope.mean()
+    d['true_slopes'] = np.array([x.slope.mean() for x in samples])
+
+    d['causal_slope'] = estimate_effect(d['df']),
+    d['causal_slopes'] = np.array([estimate_effect(_df)
+                                   for _df in d['samples']])
+
+    return d
 
 
 def rmse(truth, prediction):
@@ -171,56 +165,37 @@ def bias(truth, prediction):
     """Return the bias between TRUTH (dataseries and PREDICTION (np array)"""
     return np.average(prediction-prep_x_data(truth))
 
-def model_diagnostics(experiments):
-    """Print MODEL diagnostics, labeling them with MODEL_STRING
+def cross_product(f, xs1, xs2):
+    """Apply f to cross of xs1 and xs2"""
+    return np.array([f(x1, x2) for x1 in xs1 for x2 in xs2])
 
-Mutates each dictionary in EXPERIMENTS, adding slope and slopes."""
-    for (model_string, d) in experiments.items():
-        d['mean-slope'] = np.average(d['slopes'])
-        d['std-slope'] = np.std(d['slopes'])
-        cross=np.array([estimate - truth
-                        for estimate in d['slopes']
-                        for truth in experiments['reality']['true-slopes']])
-        d['mean-bias'] = np.average(cross)
-        d['std-bias'] = np.std(cross)
-    return experiments
+def model_diagnostics(d):
+    """Generate model diangostics for each dictionary (D) of an experiment.
 
-def scatter_plot(experiments, experiment='randomized', title=''):
-    """return a scatter plot of DATA with regression fits overlaid"""
-    facet = sns.relplot(data=experiments[experiment]['df'], x='SM', y='ET')
-    ax = facet.ax
-    xlim = np.array(ax.get_xlim()).reshape(-1, 1)
-    for (name, d) in experiments.items():
-        try:
-            ax.plot(np.squeeze(xlim), np.squeeze(d['model'].predict(xlim)), label=name)
-        except KeyError: # causal estimtes don't have a model; just a slope
-            'okay'
-    mean_slope = experiments['reality']['true-slope']
-    f = lambda x: experiments[experiment]['model'].intercept_ + mean_slope * x
-    ax.plot(np.squeeze(xlim), list(map(f, np.squeeze(xlim))), label='truth')
-    plt.title(title)
-    plt.legend()
-    return
+Mutates dictionary to add diagnostic terms.
+"""
+    d['naive_error'] = d['naive_slope'] - d['true_slope']
+    d['naive_errors'] = cross_product((lambda x1, x2: x1 - x2),
+                                      d['naive_slopes'], d['true_slopes'])
+    return d
 
+# def scatter_plot(experiments, experiment='randomized', title=''):
+#     """return a scatter plot of DATA with regression fits overlaid"""
+#     facet = sns.relplot(data=experiments[experiment]['df'], x='SM', y='ET')
+#     ax = facet.ax
+#     xlim = np.array(ax.get_xlim()).reshape(-1, 1)
+#     for (name, d) in experiments.items():
+#         try:
+#             ax.plot(np.squeeze(xlim), np.squeeze(d['model'].predict(xlim)), label=name)
+#         except KeyError: # causal estimtes don't have a model; just a slope
+#             'okay'
+#     mean_slope = experiments['reality']['true-slope']
+#     f = lambda x: experiments[experiment]['model'].intercept_ + mean_slope * x
+#     ax.plot(np.squeeze(xlim), list(map(f, np.squeeze(xlim))), label='truth')
+#     plt.title(title)
+#     plt.legend()
+#     return
 
-def box_plot(experiments, title=''):
-    """make a histogram plot"""
-    fig, ax = plt.subplots()
-    dfs = c.deque()
-    for (name, d) in experiments.items():
-        _df = pd.DataFrame(d['slopes'], columns=['dET/dSM'])
-        _df['name'] = name
-        dfs.append(_df)
-    _df = pd.DataFrame(experiments['reality']['true-slopes'],
-                       columns=['dET/dSM'])
-    _df['name'] = 'truth'
-    dfs.append(_df)
-    df = pd.concat(dfs, ignore_index=True)
-    ax = sns.boxplot(x='name', y='dET/dSM', data=df)
-    ax.set_ylabel('dET/dSM (slope)')
-    ax.set_xlabel('Experiment')
-    plt.title(title)
-    return
 
 def pkl_path(site):
     """Return the path to a pickle file for SITE"""
@@ -241,28 +216,125 @@ As a side effect, may write a pickle file to data/SITE.pkl"""
     if os.path.exists(pkl_path(site)):
         experiments = load_pickled_experiments(site)
     else:
-        reality = load_experiment(site, 'reality-slope')\
-                  .groupby(['year', 'doy'])\
-                  .apply(reality_diagnostics)
-        reality = reality[~np.isnan(reality.slope)]
-        experiment_names = ['randomized']
-        experiments = dict([(name, {'df' : load_experiment(site, name)})
-                            for name in experiment_names])
-
-        experiments['reality'] = {'df' : reality}
-
-        experiments = fit_models(experiments)
-        experiments = model_diagnostics(experiments)
+        experiment_names = ['randomized',
+                            'reality-slope']
+        experiments = dict()
+        for name in experiment_names:
+            experiments[name] = model_diagnostics(
+                fit_models({'df' : load_experiment(site, name)}))
+        experiments['confounding_error'] =\
+             experiments['reality-slope']['naive_error'] - experiments['randomized']['naive_error']
+        experiments['confounding_errors'] =\
+             cross_product((lambda x1, x2: x1 - x2),
+                           experiments['reality-slope']['naive_errors'],
+                           experiments['randomized']['naive_errors'])
+        experiments['confounding_absolute_error'] =\
+             np.absolute(experiments['reality-slope']['naive_error']) -\
+             np.absolute(experiments['randomized']['naive_error'])
+        experiments['confounding_absolute_errors'] =\
+             cross_product((lambda x1, x2: x1 - x2),
+                           np.absolute(experiments['reality-slope']['naive_errors']),
+                           np.absolute(experiments['randomized']['naive_errors']))
 
         f = open(pkl_path(site), 'wb')
         pickle.dump(experiments, f)
         f.close()
-
-    box_plot(experiments, site)
-    scatter_plot(experiments, experiment='reality', title=site)
-
     return experiments
 
+
+def slope_box_plot(sites, title=''):
+    """make a box plot of the true vs naive slopes for each site"""
+    fig, ax = plt.subplots()
+    dfs = c.deque()
+    for (site, experiments) in sites.items():
+        d = experiments['reality-slope']
+        _df = pd.DataFrame(d['naive_slopes'], columns=['dET/dSM'])
+        _df['slope type'] = 'naive'
+        _df['site'] = site
+        dfs.append(_df)
+        _df = pd.DataFrame(d['true_slopes'],
+                           columns=['dET/dSM'])
+        _df['slope type'] = 'truth'
+        _df['site'] = site
+        dfs.append(_df)
+    df = pd.concat(dfs, ignore_index=True)
+    ax = sns.boxplot(x='site', y='dET/dSM', hue='slope type', data=df)
+    ax.set_ylabel('dET/dSM (slope)')
+    ax.set_xlabel('Site')
+    plt.legend()
+    plt.title(title)
+    return
+
+def error_plot(sites, title=''):
+    """make a box plot the due to confounding and specification for each site
+
+this can take awhile."""
+    fig, ax = plt.subplots()
+    dfs = c.deque()
+    for (site, experiments) in sites.items():
+        _df = pd.DataFrame(np.absolute(experiments['randomized']['naive_errors']),
+                           columns=['dET/dSM error'])
+        _df['error type'] = 'specification'
+        _df['site'] = site
+        dfs.append(_df)
+        _df = pd.DataFrame(np.absolute(experiments['confounding_errors']),
+                           columns=['dET/dSM error'])
+        _df['error type'] = 'confounding'
+        _df['site'] = site
+        dfs.append(_df)
+    df = pd.concat(dfs, ignore_index=True)
+    ax = sns.boxplot(x='site', y='dET/dSM error', hue='error type', data=df)
+    ax.set_ylabel('dET/dSM absolute error')
+    ax.set_xlabel('Site')
+    plt.legend()
+    plt.title(title)
+    return
+
+def error_plot_2_absolute(sites, title=''):
+    """make a box plot of error due to confounding and specification"""
+    fig, ax = plt.subplots()
+    dfs = c.deque()
+    for (site, experiments) in sites.items():
+        _df = pd.DataFrame(np.absolute(experiments['randomized']['naive_errors']),
+                           columns=['dET/dSM error'])
+        _df['error type'] = 'specification'
+        _df['site'] = site
+        dfs.append(_df)
+        _df = pd.DataFrame(np.absolute(experiments['reality-slope']['naive_errors']),
+                           columns=['dET/dSM error'])
+        _df['error type'] = 'specification & confounding'
+        _df['site'] = site
+        dfs.append(_df)
+    df = pd.concat(dfs, ignore_index=True)
+    ax = sns.boxplot(x='site', y='dET/dSM error', hue='error type', data=df)
+    ax.set_ylabel('dET/dSM absolute error')
+    ax.set_xlabel('Site')
+    plt.legend()
+    plt.title(title)
+    return
+
+def error_plot_2(sites, title=''):
+    """make a box plot of error due to confounding and specification"""
+    fig, ax = plt.subplots()
+    dfs = c.deque()
+    for (site, experiments) in sites.items():
+        _df = pd.DataFrame(experiments['randomized']['naive_errors'],
+                           columns=['dET/dSM error'])
+        _df['error type'] = 'specification'
+        _df['site'] = site
+        dfs.append(_df)
+        _df = pd.DataFrame(experiments['reality-slope']['naive_errors'],
+                           columns=['dET/dSM error'])
+        _df['error type'] = 'specification & confounding'
+        _df['site'] = site
+        dfs.append(_df)
+    df = pd.concat(dfs, ignore_index=True)
+    ax = sns.boxplot(x='site', y='dET/dSM error', hue='error type', data=df)
+    ax.set_ylabel('dET/dSM error')
+    ax.set_xlabel('Site')
+    plt.legend()
+    plt.title(title)
+    return
 
 f = open('%s/stations.pkl' % data_dir, 'rb')
 # stations is a dictionary of {human readable site name : igra station ids}
@@ -270,11 +342,16 @@ stations = pickle.load(f)
 f.close()
 
 sites = dict()
-CLEAN_SITES = True
+CLEAN_SITES = False
+
 for site in stations.keys():
     if CLEAN_SITES and os.path.exists(pkl_path(site)):
         os.remove(pkl_path(site))
     print('Working on %s\n' % site)
     sites[site] = site_analysis(site)
+
+slope_box_plot(sites)
+error_plot_2(sites)
+error_plot_2_absolute(sites)
 
 plt.show()

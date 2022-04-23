@@ -408,53 +408,16 @@ def write_experiment(prefix_f, df):
         write_row(prefix_f, series, VARIABLE_ELISP_KEYS)
     return True
 
-def montecarlo_randomized(n, df, randomized_columns=None):
-    """Genearte N samples of DF where COLUMNS are randomized from each
-other, but all other variables have the same correlation structure as
-DF. If randomized_columns is None, all columns will be randomized."""
+def randomize_soil_moisture(df):
+    """generate a set of data where soil moisture is randomly sampled
+indedpendent of the synoptics
+
+    """
     random.seed(a=1)
-    df = df[VARIABLE_PANDAS_KEYS]
-    if randomized_columns is None:
-        randomized_columns = VARIABLE_PANDAS_KEYS
-    index_range = range(n)
-    random_df = pd.DataFrame([df.iloc[random.randrange(df.shape[0])]
-                              for _i in index_range],
-                             index=index_range)
-    for (label, datas) in df.iteritems():
-        if label in randomized_columns:
-            random_df[label] = \
-                [datas.iloc[random.randrange(df.shape[0])] for _i in index_range]
-    random_df['n'] = index_range
-    return random_df
-
-def montecarlo_correlated(n, df, correlated_columns=set()):
-    """Generate N samples of DF witht the same correlation structure as DF
-    for COLUMNS.  All other indices will be randomized (uncorrelated
-    with each other and the correlated variables.
-
-    """
-    return montecarlo_randomized(n, df,
-                                   randomized_columns=(VARIABLE_PANDAS_KEYS
-                                                       - set(correlated_columns)))
-
-ATMOSPHERE_KEYS = {'u', 'advq_tropo', 'cc', 'q', 'tstart',
-                   'Ps', 'w_average', 'h',  'theta', 'v',
-                   'advt_tropo', 'doy'}
-
-LAND_KEYS = {'LAI', 'Tsoil', 'T2', 'Ts' 'w_average', 'tstart'}
-
-def randomized_experiment(n, df):
-    """generate a data of a randomized synoptic data N long,
-using DF to generate data
-
-    """
-    return montecarlo_randomized(n, df, randomized_columns=set(df.columns))
-
-
-# dictionary of name:function of n, df for generating data
-experiments = {
-    'randomized' : randomized_experiment,
-    }
+    dfout = df.copy()
+    dfout['w_average'] = [df['w_average'][random.randrange(df.shape[0])]
+                          for _i in range(df.shape[0])]
+    return dfout
 
 def slope_experiment(_ds):
     """Take a _ds and make a causal experiment where we reduce and increase SM by 0.01"""
@@ -510,17 +473,16 @@ SITE_KEY is a human name and must be a key in STATION_IDS
     write_row(lambda _df: '%s-constants.el' % site_key, df_mode,
               (set(elisp_conversion.keys()) - VARIABLE_ELISP_KEYS))
 
-    n = 10000
 
     write_experiment(lambda _df: '%s-reality-slope/%s_%04d_%03d_SM%d/variables.el'\
                      % (site_key, site_key, _df.datetime.year, _df.doy, _df.experiment),
                      pandas_mapappend(df, slope_experiment))
 
-    for index in experiments.keys():
-        directory = '%s-%s' % (site_key, index)
-        if not os.path.exists(directory):
-            write_experiment(lambda _df: '%s/%s_%06d/variables.el' % (directory, site_key, _df.n),
-                             experiments[index](n, df))
+    write_experiment(lambda _df: '%s-randomized/%s_%04d_%03d_SM%d/variables.el'\
+                     % (site_key, site_key, _df.datetime.year, _df.doy, _df.experiment),
+                     pandas_mapappend(randomize_soil_moisture(df),
+                                      slope_experiment))
+
     return True
 
 for site in STATION_IDS.keys():
