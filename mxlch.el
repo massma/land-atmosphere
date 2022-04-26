@@ -180,10 +180,37 @@ If ARG is true, overwrite exisitng nameslist if it exists."
           (mxlch-write-namelist namelist-path))))
     't))
 
-(defun mxlch-experiment-name-from-path (path)
+(defun mxlch-site-name-from-path (path)
   "Get the experiment name from PATH."
   (string-match (rx (group (+? (not blank))) "-constants.el") path)
   (match-string 1 path))
+
+(defun mxlch-write-constants ()
+  "Write all MXLCH constant values to a csv file."
+  (interactive)
+  (mxlch-set-non-default-constants)
+  (let ((constant-inputs (directory-files
+                          mxlch-data-dir
+                          nil
+                          (rx (+? (not blank)) "-constants.el"))))
+    (find-file (concat mxlch-data-dir "/" "site-constants.csv"))
+    (erase-buffer)
+    (insert "site,C1sat,C2ref,CLa,CLb,CLc,albedo,cveg,latt,wfc,wsat,wwilt,z0h,z0m\n")
+    (dolist (input constant-inputs)
+      (load (concat mxlch-data-dir "/" input))
+      (insert (mxlch-site-name-from-path input))
+      (insert ",")
+      (dolist (x (list mxlch-C1sat mxlch-C2ref mxlch-CLa mxlch-CLb
+                       mxlch-CLc mxlch-albedo mxlch-cveg
+                       mxlch-latt mxlch-wfc mxlch-wsat
+                       mxlch-wwilt mxlch-z0h mxlch-z0m))
+        (insert x) (insert ","))
+      (delete-char -1)
+      (insert "
+"))
+    (save-buffer)
+    (kill-buffer)))
+
 
 (defun mxlch-write-namelists (arg)
   "Write all namelists for experiments in `mxlch-data-dir'.
@@ -201,7 +228,7 @@ In that case, it will overwrite the namelist."
     (dolist (input constant-inputs)
       (load (concat mxlch-data-dir "/" input))
       (mxlch-write-namelists-experiment
-       (mxlch-experiment-name-from-path input)
+       (mxlch-site-name-from-path input)
        arg))))
 
 (defun mxlch-run-models (arg)
@@ -450,6 +477,7 @@ But be wary, this will grab and lock up your emacs."
                   nil
                   "soundings.py"))
   (mxlch-write-namelists arg)
+  (mxlch-write-constants)
   (mxlch-run-models arg)
   (mxlch-write-all-csvs arg)
   'ok)
