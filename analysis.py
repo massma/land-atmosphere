@@ -209,6 +209,11 @@ with regression fits overlaid"""
     plt.title(title)
     return
 
+# below site order is low to increasing d/et dsm, but we could also cluster by similar cliamtes, etc.
+SITE_ORDER = ['bergen', 'idar_oberstein', 'milano',  'quad_city',
+              'lindenberg', 'las_vegas', 'kelowna', 'elko',
+              'spokane', 'great_falls', 'riverton', 'flagstaff']
+
 def slope_fit_plot(sites):
     """plto sum of squared error histogram for sites
 
@@ -263,29 +268,26 @@ As a side effect, may write a pickle file to data/SITE.pkl"""
         f.close()
     return experiments
 
-# below site order is low to increasing d/et dsm, but we could also cluster by similar cliamtes, etc.
-SITE_ORDER = ['bergen', 'idar_oberstein', 'milano',  'quad_city',
-              'lindenberg', 'las_vegas', 'kelowna', 'elko',
-              'spokane', 'great_falls', 'riverton', 'flagstaff']
+def normalize_y_axis(ax1, ax2):
+    """make the limites of the y axis the same between AX1 and AX2"""
+    ylim1 = ax1.get_ylim()
+    ylim2 = ax2.get_ylim()
+    lim= [min(ylim1[0], ylim2[0]), max(ylim1[1], ylim2[1])]
+    ax1.set_ylim(lim)
+    ax2.set_ylim(lim)
+    return (ax1, ax2)
 
 def slope_box_plot(sites, title=''):
     """make a box plot of the true vs naive slopes for each site"""
-    fig, ax = plt.subplots()
+    fig = plt.figure()
+    fig.set_figheight(fig.get_figheight()*2.0)
+    fig.set_figwidth(fig.get_figwidth()*2.0)
+    (ax1, ax2) = fig.subplots(nrows=2, ncols=1)
     dfs = c.deque()
     for (site, experiments) in sites.items():
         d = experiments['reality-slope']
         _df = pd.DataFrame(d['naive_slopes'], columns=['dET/dSM'])
         _df['slope type'] = 'naive'
-        _df['site'] = site
-        dfs.append(_df)
-        _df = pd.DataFrame(experiments['randomized']['naive_slopes'],
-                           columns=['dET/dSM'])
-        _df['slope type'] = 'randomized-naive'
-        _df['site'] = site
-        dfs.append(_df)
-        _df = pd.DataFrame(experiments['randomized']['true_slopes'],
-                           columns=['dET/dSM'])
-        _df['slope type'] = 'randomized-truth'
         _df['site'] = site
         dfs.append(_df)
         _df = pd.DataFrame(d['true_slopes'],
@@ -294,11 +296,31 @@ def slope_box_plot(sites, title=''):
         _df['site'] = site
         dfs.append(_df)
     df = pd.concat(dfs, ignore_index=True)
-    ax = sns.boxplot(x='site', y='dET/dSM', hue='slope type', data=df,
-                     order=SITE_ORDER)
-    ax.set_ylabel('dET/dSM (slope)')
-    ax.set_xlabel('Site')
+    ax1 = sns.boxplot(x='site', y='dET/dSM', hue='slope type', data=df,
+                      order=SITE_ORDER, ax=ax1)
+    ax1.set_ylabel('dET/dSM (slope)')
+    ax1.set_title('Simulated Reality (Soil Moisture and Evaporation are Confounded)')
+    ax1.set_xlabel('Site')
     plt.legend()
+    dfs = c.deque()
+    for (site, experiments) in sites.items():
+        _df = pd.DataFrame(experiments['randomized']['naive_slopes'],
+                           columns=['dET/dSM'])
+        _df['slope type'] = 'naive'
+        _df['site'] = site
+        dfs.append(_df)
+        _df = pd.DataFrame(experiments['randomized']['true_slopes'],
+                           columns=['dET/dSM'])
+        _df['slope type'] = 'truth'
+        _df['site'] = site
+        dfs.append(_df)
+    df = pd.concat(dfs, ignore_index=True)
+    ax2 = sns.boxplot(x='site', y='dET/dSM', hue='slope type', data=df,
+                      order=SITE_ORDER, ax=ax2)
+    (ax1, ax2) = normalize_y_axis(ax1, ax2)
+    ax2.set_ylabel('dET/dSM (slope)')
+    ax2.set_xlabel('Site')
+    ax2.set_title('De-confounded Reality (soil moisture is sampled randomly and independently)')
     plt.title(title)
     return
 
@@ -375,8 +397,7 @@ for (site, experiments) in sites.items():
     print('max site: %f' % experiments['reality-slope']['df']['sum_squared_error'].max())
     print('max site: %f\n' % experiments['randomized']['df']['sum_squared_error'].max())
 
-    scatter_plot(experiments, title=site)
-    #
+    # scatter_plot(experiments, title=site)
 
 
 # sites where the slope is biased high (but these also usually
@@ -390,7 +411,27 @@ confouding_decreases = {'las_vegas', 'elko', 'riverton', 'flagstaff'}
 # have a portion of zero slope data
 zero_slopes = {'elko', 'riverton', 'spokane', 'flagstaff', 'las_vegas'}
 
-# WHAT IS GOING ON AT SPOKANE vs others?
+# bsk = cold semi-arid climate
+bsk_sites = {'flagstaff', 'riverton', 'great_falls', 'elko', }
+
+# hot desert climate
+bwh_sites = {'las_vegas', }
+
+# warm-summer humid continetnal climate
+dfb_sites = {'spokane', 'kelowna', 'lindenberg'}
+
+# hot-summer humid continental climate
+dfa_sites = {'quad_city'}
+
+# temperate ocean climate with no dry season
+cfb_sites = {'idar-oberstein', 'bergen'}
+
+# humid subtropical climate with no dry season
+cfa_sites = {'milano'}
+
+# WHAT IS GOING ON AT SPOKANE vs others?  spokane is kind of like
+# greatfalls, but much more spread than elko, riverton, flagstaff and
+# lasvegas in thenon-zero slope region
 
 slope_fit_plot(sites)
 
