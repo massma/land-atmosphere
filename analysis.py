@@ -280,9 +280,7 @@ def normalize_y_axis(ax1, ax2):
 def slope_box_plot(sites, title=''):
     """make a box plot of the true vs naive slopes for each site"""
     fig = plt.figure()
-    fig.set_figheight(fig.get_figheight()*2.0)
-    fig.set_figwidth(fig.get_figwidth()*2.0)
-    (ax1, ax2) = fig.subplots(nrows=2, ncols=1)
+    ax1 = fig.subplots(nrows=1, ncols=1)
     dfs = c.deque()
     for (site, experiments) in sites.items():
         d = experiments['reality-slope']
@@ -299,28 +297,8 @@ def slope_box_plot(sites, title=''):
     ax1 = sns.boxplot(x='site', y='dET/dSM', hue='slope type', data=df,
                       order=SITE_ORDER, ax=ax1)
     ax1.set_ylabel('dET/dSM (slope)')
-    ax1.set_title('Simulated Reality (Soil Moisture and Evaporation are Confounded)')
     ax1.set_xlabel('Site')
     plt.legend()
-    dfs = c.deque()
-    for (site, experiments) in sites.items():
-        _df = pd.DataFrame(experiments['randomized']['naive_slopes'],
-                           columns=['dET/dSM'])
-        _df['slope type'] = 'naive'
-        _df['site'] = site
-        dfs.append(_df)
-        _df = pd.DataFrame(experiments['randomized']['true_slopes'],
-                           columns=['dET/dSM'])
-        _df['slope type'] = 'truth'
-        _df['site'] = site
-        dfs.append(_df)
-    df = pd.concat(dfs, ignore_index=True)
-    ax2 = sns.boxplot(x='site', y='dET/dSM', hue='slope type', data=df,
-                      order=SITE_ORDER, ax=ax2)
-    (ax1, ax2) = normalize_y_axis(ax1, ax2)
-    ax2.set_ylabel('dET/dSM (slope)')
-    ax2.set_xlabel('Site')
-    ax2.set_title('De-confounded Reality (soil moisture is sampled randomly and independently)')
     plt.title(title)
     return
 
@@ -431,9 +409,8 @@ cfa_sites = {'milano'}
 
 # WHAT IS GOING ON AT SPOKANE vs others?  spokane is kind of like
 # greatfalls, but much more spread than elko, riverton, flagstaff and
-# lasvegas in thenon-zero slope region
-
-slope_fit_plot(sites)
+# lasvegas in thenon-zero slope region. basically just shifted more
+# arid than kelowna and lindenberg.
 
 plt.show()
 

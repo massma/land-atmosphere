@@ -41,6 +41,75 @@ this file is!"
 
 
 ;;;;  Utility functions
+(defun mxlch-generic-quarter (latlon f)
+  "Caluclate the nearest (as defined by F) quarter degree of LATLON.
+
+F can be something like round, ceiling, floor."
+  (number-to-string
+   (+ 0.25 (* 0.5 (funcall f (* 2.0 (- latlon 0.25)))))))
+
+(defun mxlch-floor-quarter (latlon)
+  "Calculate the nearest quarter degree of LATLON."
+  (mxlch-generic-quarter latlon #'floor))
+
+(defun mxlch-ceiling-quarter (latlon)
+  "Calculate the nearest quarter degree of LATLON."
+  (mxlch-generic-quarter latlon #'ceiling))
+
+(defun mxlch-nearest-quarter (latlon)
+  "Calculate the nearest quarter degree of LATLON."
+  (mxlch-generic-quarter latlon #'round))
+
+(defun mxlch-lat-lon-search (lat lon)
+  "Search buffer for LAT and LON, separated by whitespace."
+  (re-search-forward (rx bol
+                         (* whitespace) (literal lat)
+                         (* whitespace) (literal lon))
+                     ))
+
+(defun mxlch-find-nearest-koppen (lat lon)
+  "Search the Koppen climate file for the 4 points nearest to LAT and LON."
+  (interactive "nLat: \nnLon: ")
+  (save-excursion
+    (let ((closest-lat (mxlch-nearest-quarter lat))
+          (smallest-lat (mxlch-floor-quarter lat))
+          (largest-lat (mxlch-ceiling-quarter lat))
+          (closest-lon (mxlch-nearest-quarter lon))
+          (smallest-lon (mxlch-floor-quarter lon))
+          (largest-lon (mxlch-ceiling-quarter lon))
+          (output-str ""))
+      (other-window -1)
+      (find-file (concat mxlch-data-dir "/" "1976-2000_ASCII.txt.gz"))
+
+      (goto-char (point-min))
+      (mxlch-lat-lon-search closest-lat closest-lon)
+      (y-or-n-p "This is the closest lat/lon.  Continue? ")
+      (setq output-str
+            (concat output-str (thing-at-point 'line t)))
+
+      (goto-char (point-min))
+      (mxlch-lat-lon-search smallest-lat smallest-lon)
+      (y-or-n-p "This is the smallest lat/lon.  Continue? ")
+      (setq output-str
+            (concat output-str (thing-at-point 'line t)))
+
+      (goto-char (point-min))
+      (mxlch-lat-lon-search largest-lat largest-lon)
+      (y-or-n-p "This is the largest lat/lon.  Continue? ")
+      (setq output-str
+            (concat output-str (thing-at-point 'line t)))
+
+      (goto-char (point-min))
+      (mxlch-lat-lon-search smallest-lat largest-lon)
+      (y-or-n-p "This is the smallest lat and lagest lon.  Continue? ")
+      (setq output-str
+            (concat output-str (thing-at-point 'line t)))
+
+      (goto-char (point-min))
+      (mxlch-lat-lon-search largest-lat smallest-lon)
+      (y-or-n-p "This is the largest lat and smallest lon.  Finish and close? ")
+      (kill-new (concat output-str (thing-at-point 'line t))))))
+
 (defun mxlch-generate-defvar ()
   "Make a namelist file into a bunch of defvars, and add it to the kill ring."
   (interactive)
