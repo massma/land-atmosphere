@@ -69,7 +69,7 @@ F can be something like round, ceiling, floor."
 (defun mxlch-find-nearest-koppen (lat lon)
   "Search the Koppen climate file for the 4 points nearest to LAT and LON."
   (interactive "nLat: \nnLon: ")
-  (save-excursion
+  (save-window-excursion
     (let* ((closest-lat (mxlch-nearest-quarter lat))
            (smallest-lat (mxlch-floor-quarter lat))
            (largest-lat (mxlch-ceiling-quarter lat))
@@ -84,8 +84,6 @@ F can be something like round, ceiling, floor."
                        "")))
                   (goto-char (point-min))
                   (mxlch-lat-lon-search lat lon)
-                  (y-or-n-p (format "This is the %s%s corner.  Continue? "
-                                    id-str nearest-str))
                   (setq output-str
                         (concat output-str
                                 (format "%s corner: %s %s\n"
@@ -93,14 +91,11 @@ F can be something like round, ceiling, floor."
                                         (substring (thing-at-point 'line t)
                                                    0 -1)
                                         nearest-str)))))))
-      (other-window -1)
       (find-file (concat mxlch-data-dir "/" "1976-2000_ASCII.txt.gz"))
-
       (funcall f smallest-lat smallest-lon "SW")
       (funcall f largest-lat smallest-lon "NW")
       (funcall f largest-lat largest-lon "NE")
       (funcall f smallest-lat largest-lon "SE")
-
       (kill-new output-str))))
 
 (defun mxlch-generate-defvar ()
