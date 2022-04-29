@@ -20,7 +20,7 @@ data_dir = "./data"
 def load_experiment(site, name):
     """Load experiment cooresponding to SITE and NAME."""
     df = pd.read_csv("%s/%s-%s.csv" % (data_dir, site, name))
-    return df[(~np.isnan(df.ET)) & (df.ET >= 0.0)]
+    return df[(~np.isnan(df.ET)) & (df.ET >= 0.0) & (df.tstart <= 8.0)]
 
 def prep_x_data(ds):
     """Take a dataseries DS and make it into the form needed by scikit fit."""
@@ -210,14 +210,12 @@ with regression fits overlaid"""
     return
 
 # below site order is low to increasing d/et dsm, but we could also cluster by similar cliamtes, etc.
-SITE_ORDER = ['bergen', 'idar_oberstein', 'milano',  'quad_city',
-              'lindenberg', 'las_vegas', 'kelowna', 'elko',
-              'spokane', 'great_falls', 'riverton', 'flagstaff']
+SITE_ORDER = ['bergen', 'idar_oberstein', 'lindenberg', 'milano','kelowna',  'quad_city',
+              'spokane', 'flagstaff', 'elko', 'las_vegas', 'riverton',
+               'great_falls'  ]
 
 def slope_fit_plot(sites):
     """plto sum of squared error histogram for sites
-
-TODO: make this one figure for all sites
 
 use swarm plot or strip plot."""
     fig = plt.figure()
@@ -367,6 +365,7 @@ for site in stations.keys():
 
 
 slope_box_plot(sites)
+slope_fit_plot(sites)
 # error_plot(sites)
 error_plot_absolute(sites)
 
@@ -389,31 +388,169 @@ confouding_decreases = {'las_vegas', 'elko', 'riverton', 'flagstaff'}
 # have a portion of zero slope data
 zero_slopes = {'elko', 'riverton', 'spokane', 'flagstaff', 'las_vegas'}
 
-# bsk = cold semi-arid climate
-bsk_sites = {'flagstaff', 'riverton', 'great_falls', 'elko', }
 
-# hot desert climate
-bwh_sites = {'las_vegas', }
+# temperate ocean climate with no dry season
+cfb_sites = {'idar-oberstein', 'bergen', 'lindenberg'}
 
-# warm-summer humid continetnal climate
-dfb_sites = {'spokane', 'kelowna', 'lindenberg'}
+# humid subtropical climate with no dry season
+cfa_sites = {'milano'}
+
+# subartic climate
+dfc_sites = {'kelowna'}
 
 # hot-summer humid continental climate
 dfa_sites = {'quad_city'}
 
-# temperate ocean climate with no dry season
-cfb_sites = {'idar-oberstein', 'bergen'}
+# mediterannean-influenced warm-summer humid continental climate
+dsb_sites = {'elko'}
 
-# humid subtropical climate with no dry season
-cfa_sites = {'milano'}
+# warm-summer mediterannean climate
+csb = {'spokane', 'flagstaff'}
+
+# cold desert climate
+bwk_climate = {'riverton', 'las_vegas'}
+
+# cold semi-arid climate
+bsk_sites = {'great_falls'}
+
+# spokane and flagstaff; great falls and riverton are nice comparisons
 
 # WHAT IS GOING ON AT SPOKANE vs others?  spokane is kind of like
 # greatfalls, but much more spread than elko, riverton, flagstaff and
 # lasvegas in thenon-zero slope region. basically just shifted more
 # arid than kelowna and lindenberg.
 
-plt.show()
-
 site_constants = pd.read_csv('%s/site-constants.csv' % data_dir)
 site_constants.set_index('site', drop=False, inplace=True)
 d = experiments['reality-slope']['df']
+
+CONSTANT_KEYS = \
+   ['C1sat',
+    'C2ref',
+    'CLa',
+    'CLb',
+    'CLc',
+    'albedo',
+    'cveg',
+    'latt',
+    'wfc',
+    'wsat',
+    'wwilt',
+    'z0h',
+    'z0m']
+
+df = sites['kelowna']['reality-slope']['df']
+STATISTICS_KEYS = \
+   [ 'SM', 'ET', 'slope', 'T2', 'Tsoil', 'Ts', 'theta', 'q', 'LAI', 'cc', 'h', 'tstart', 'day']
+
+# diagnostics: rh
+
+EPS = 0.622
+
+# thermo funcitons for calculating RH
+def e_s(t_a):
+    """calculates e_s in Pa, from shuttleworth equation 2.17.
+    t_a is in kelvin"""
+    t_c = t_a - 273.15
+    return 610.8 * np.exp(17.27 * t_c / (237.3 + t_c))
+
+def specific_humidity(e_s, p):
+    """slide 9, lecture 2; p and e_s must be same units"""
+    return EPS * e_s / (p - (1.0 - EPS) * e_s)
+
+def e_from_q(q, p):
+    """invert `specific_humidity'"""
+    return q * p / (EPS + (1 - EPS) * q)
+
+def rh_from_t_a_q_p(t_a, q, p):
+    """calcualte rh from t_a (in kelvin), q (unitless), and p (Pa)"""
+    return np.minimum(1.0, np.maximum(0.0, (e_from_q(q, p)) / e_s(t_a)))
+
+def t_from_theta_p(theta, p):
+    """inverts `theta_from_t_p'. Theta in kelvin, pressure in pascal."""
+    return theta * (p / 100000.0) ** (2.0 / 7.0)
+
+# TODO: calculate T_air form tehta
+rh = rh_from_t_a_q_p(df['theta'],
+                     df['q'] / 1000.0,
+                     df['pressure']*100.0)
+
+
+def summary_table(site_constants, sites, f):
+    """Make summary table, with one diagnost rh"""
+    f.write('variable &')
+    for site in SITE_ORDER[:-1]:
+        f.write(' %s &' % site)
+    f.write(' %s \\\\\n' % SITE_ORDER[-1])
+    f.write('\\midrule\n')
+    for key in CONSTANT_KEYS:
+        f.write('%s & ' % key)
+        for site in SITE_ORDER[:-1]:
+            f.write(' %5.2f &' % site_constants.loc[site, key])
+        f.write(' %5.2f \\\\\n' % site_constants.loc[SITE_ORDER[-1], key])
+    for key in STATISTICS_KEYS:
+        f.write('%s & ' % key)
+        for site in SITE_ORDER[:-1]:
+            ds = sites[site]['reality-slope']['df'][key]
+            f.write(' %6.2f$\pm$%6.2f &' % (ds.mean(), ds.std()))
+        ds = sites[SITE_ORDER[-1]]['reality-slope']['df'][key]
+        f.write(' %6.2f$\pm$%6.2f \\\\\n' % (ds.mean(), ds.std()))
+    f.write('rh & ')
+    for site in SITE_ORDER[:-1]:
+        _df = sites[site]['reality-slope']['df']
+        rh = rh_from_t_a_q_p(_df['theta'],
+                             _df['q'] / 1000.0,
+                             _df['pressure']*100.0)
+        f.write(' %6.2f$\pm$%6.2f &' % (rh.mean(), rh.std()))
+    _df = sites[SITE_ORDER[-1]]['reality-slope']['df']
+    rh = rh_from_t_a_q_p(_df['theta'],
+                         _df['q'] / 1000.0,
+                         _df['pressure']*100.0)
+    f.write(' %6.2f$\pm$%6.2f &' % (rh.mean(), rh.std()))
+    f.write('ws & ')
+    for site in SITE_ORDER[:-1]:
+        _df = sites[site]['reality-slope']['df']
+        ws = np.sqrt(_df['u']**2 + _df['v']**2)
+        f.write(' %6.2f$\pm$%6.2f &' % (ws.mean(), ws.std()))
+    _df = sites[SITE_ORDER[-1]]['reality-slope']['df']
+    ws = np.sqrt(_df['u']**2 + _df['v']**2)
+    f.write(' %6.2f$\pm$%6.2f &' % (ws.mean(), ws.std()))
+    return
+
+def site_comparison_figures(site_constants, sites):
+    """Compare each site in a figure. For now, generate a spearate figure for each site"""
+    for key in CONSTANT_KEYS:
+        fig = plt.figure()
+        ax = fig.subplots(nrows=1, ncols=1)
+        sns.stripplot(x=SITE_ORDER,
+                      y=[site_constants.loc[site, key]
+                         for site in SITE_ORDER])
+        ax.set_title(key)
+        ax.set_ylabel(key)
+        ax.set_xlabel(key)
+    dfs = c.deque()
+    for site in SITE_ORDER:
+        dfs.append(sites[site]['reality-slope']['df'])
+    df = pd.concat(dfs, ignore_index=True)
+    df['rh'] = rh_from_t_a_q_p(df['theta'],
+                               df['q'] / 1000.0,
+                               df['pressure']*100.0)
+    df['ws'] = np.sqrt(df['u']**2 + df['v']**2)
+    keys = ['ws', 'rh']
+    keys.extend(STATISTICS_KEYS)
+    for key in keys:
+        fig = plt.figure()
+        ax = fig.subplots(nrows=1, ncols=1)
+        sns.boxplot(x='site', y=key, data=df, order=SITE_ORDER)
+        ax.set_title(key)
+    return
+
+
+f = open('/home/adam/dissertation/tables/table3-1.tex', 'w')
+summary_table(site_constants, sites, f)
+f.close()
+site_comparison_figures(site_constants, sites)
+plt.show()
+
+# hypthesis for spokane and great falls: less fraction sub wwilt than other sites
+# (and higher latitude/more seasonal cycle)
