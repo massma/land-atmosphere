@@ -214,24 +214,36 @@ SITE_ORDER = ['bergen', 'idar_oberstein', 'lindenberg', 'milano','kelowna',  'qu
               'spokane', 'flagstaff', 'elko', 'las_vegas', 'riverton',
                'great_falls'  ]
 
-def slope_fit_plot(sites):
+CONCATS = dict()
+def concat_experiment(key):
+    """Concat all experiments given by KEY ('reality-slope' or 'randomized').
+
+This does a crude memoization to CONCATS, which assumes that sites is
+always the same input. (a very bad idea)
+
+    """
+    if key in CONCATS:
+        return CONCATS[key]
+    else:
+        dfs = c.deque()
+        for site in SITE_ORDER:
+            dfs.append(SITES[site][key]['df'])
+        df = pd.concat(dfs, ignore_index=True)
+        CONCATS[key] = df
+        return df
+
+def slope_fit_plot():
     """plto sum of squared error histogram for sites
 
 use swarm plot or strip plot."""
     fig = plt.figure()
     fig.set_figwidth(fig.get_figwidth()*2.0)
     (ax0, ax1) = fig.subplots(nrows=1, ncols=2)
-    dfs = c.deque()
-    for d in sites.values():
-        dfs.append(d['reality-slope']['df'])
-    _df = pd.concat(dfs, ignore_index=True)
+    _df = concat_experiment('reality-slope')
     ax0 = sns.stripplot(data=_df, x='sum_squared_error', y='site', ax=ax0,
                         order=SITE_ORDER)
     ax0.set_title('Reality')
-    dfs = c.deque()
-    for d in sites.values():
-        dfs.append(d['randomized']['df'])
-    _df = pd.concat(dfs, ignore_index=True)
+    _df = concat_experiment('randomized')
     ax1 = sns.stripplot(data=_df, x='sum_squared_error', y='site', ax=ax1)
     ax1.set_title('Randomized')
     return
@@ -275,12 +287,12 @@ def normalize_y_axis(ax1, ax2):
     ax2.set_ylim(lim)
     return (ax1, ax2)
 
-def slope_box_plot(sites, title=''):
+def slope_box_plot(title=''):
     """make a box plot of the true vs naive slopes for each site"""
     fig = plt.figure()
     ax1 = fig.subplots(nrows=1, ncols=1)
     dfs = c.deque()
-    for (site, experiments) in sites.items():
+    for (site, experiments) in SITES.items():
         d = experiments['reality-slope']
         _df = pd.DataFrame(d['naive_slopes'], columns=['dET/dSM'])
         _df['slope type'] = 'naive'
@@ -300,11 +312,11 @@ def slope_box_plot(sites, title=''):
     plt.title(title)
     return
 
-def error_plot_absolute(sites, title=''):
+def error_plot_absolute(title=''):
     """make a box plot of error due to confounding and specification"""
     fig, ax = plt.subplots()
     dfs = c.deque()
-    for (site, experiments) in sites.items():
+    for (site, experiments) in SITES.items():
         _df = pd.DataFrame(np.absolute(experiments['randomized']['naive_errors']),
                            columns=['dET/dSM error'])
         _df['error type'] = 'specification'
@@ -324,11 +336,11 @@ def error_plot_absolute(sites, title=''):
     plt.title(title)
     return
 
-def error_plot(sites, title=''):
+def error_plot(title=''):
     """make a box plot of error due to confounding and specification"""
     fig, ax = plt.subplots()
     dfs = c.deque()
-    for (site, experiments) in sites.items():
+    for (site, experiments) in SITES.items():
         _df = pd.DataFrame(experiments['randomized']['naive_errors'],
                            columns=['dET/dSM error'])
         _df['error type'] = 'specification'
@@ -354,22 +366,22 @@ f = open('%s/stations.pkl' % data_dir, 'rb')
 stations = pickle.load(f)
 f.close()
 
-sites = dict()
+SITES = dict()
 CLEAN_SITES = False
 
 for site in stations.keys():
     if CLEAN_SITES and os.path.exists(pkl_path(site)):
         os.remove(pkl_path(site))
     print('Working on %s\n' % site)
-    sites[site] = site_analysis(site)
+    SITES[site] = site_analysis(site)
 
 
-slope_box_plot(sites)
-slope_fit_plot(sites)
-# error_plot(sites)
-error_plot_absolute(sites)
+slope_box_plot()
+# slope_fit_plot()
+# error_plot()
+error_plot_absolute()
 
-for (site, experiments) in sites.items():
+for (site, experiments) in SITES.items():
     print("*****%s******" % site)
     print('max site: %f' % experiments['reality-slope']['df']['sum_squared_error'].max())
     print('max site: %f\n' % experiments['randomized']['df']['sum_squared_error'].max())
@@ -390,7 +402,7 @@ zero_slopes = {'elko', 'riverton', 'spokane', 'flagstaff', 'las_vegas'}
 
 
 # temperate ocean climate with no dry season
-cfb_sites = {'idar-oberstein', 'bergen', 'lindenberg'}
+cfb_sites = {'idar_oberstein', 'bergen', 'lindenberg'}
 
 # humid subtropical climate with no dry season
 cfa_sites = {'milano'}
@@ -413,6 +425,20 @@ bwk_climate = {'riverton', 'las_vegas'}
 # cold semi-arid climate
 bsk_sites = {'great_falls'}
 
+SITE_CLIMATES = \
+    { 'bergen' : 'Cfb',
+      'idar_oberstein' : 'Cfb',
+      'lindenberg' : 'Cfb',
+      'milano' : 'Cfa',
+      'kelowna' : 'Dfc',
+      'quad_city' : 'Dfa',
+      'spokane' : 'Csb',
+      'flagstaff' : 'Csb',
+      'elko' : 'Dsb',
+      'las_vegas' : 'Bwk',
+      'riverton' : 'Bwk',
+      'great_falls' : 'Bsk'}
+
 # spokane and flagstaff; great falls and riverton are nice comparisons
 
 # WHAT IS GOING ON AT SPOKANE vs others?  spokane is kind of like
@@ -420,26 +446,7 @@ bsk_sites = {'great_falls'}
 # lasvegas in thenon-zero slope region. basically just shifted more
 # arid than kelowna and lindenberg.
 
-site_constants = pd.read_csv('%s/site-constants.csv' % data_dir)
-site_constants.set_index('site', drop=False, inplace=True)
-d = experiments['reality-slope']['df']
 
-CONSTANT_KEYS = \
-   ['C1sat',
-    'C2ref',
-    'CLa',
-    'CLb',
-    'CLc',
-    'albedo',
-    'cveg',
-    'latt',
-    'wfc',
-    'wsat',
-    'wwilt',
-    'z0h',
-    'z0m']
-
-df = sites['kelowna']['reality-slope']['df']
 STATISTICS_KEYS = \
    [ 'SM', 'ET', 'slope', 'T2', 'Tsoil', 'Ts', 'theta', 'q', 'LAI', 'cc', 'h', 'tstart', 'day']
 
@@ -470,13 +477,7 @@ def t_from_theta_p(theta, p):
     """inverts `theta_from_t_p'. Theta in kelvin, pressure in pascal."""
     return theta * (p / 100000.0) ** (2.0 / 7.0)
 
-# TODO: calculate T_air form tehta
-rh = rh_from_t_a_q_p(df['theta'],
-                     df['q'] / 1000.0,
-                     df['pressure']*100.0)
-
-
-def summary_table(site_constants, sites, f):
+def summary_table(f):
     """Make summary table, with one diagnost rh"""
     f.write('variable &')
     for site in SITE_ORDER[:-1]:
@@ -486,52 +487,49 @@ def summary_table(site_constants, sites, f):
     for key in CONSTANT_KEYS:
         f.write('%s & ' % key)
         for site in SITE_ORDER[:-1]:
-            f.write(' %5.2f &' % site_constants.loc[site, key])
-        f.write(' %5.2f \\\\\n' % site_constants.loc[SITE_ORDER[-1], key])
+            f.write(' %5.2f &' % SITE_CONSTANTS.loc[site, key])
+        f.write(' %5.2f \\\\\n' % SITE_CONSTANTS.loc[SITE_ORDER[-1], key])
     for key in STATISTICS_KEYS:
         f.write('%s & ' % key)
         for site in SITE_ORDER[:-1]:
-            ds = sites[site]['reality-slope']['df'][key]
+            ds = SITES[site]['reality-slope']['df'][key]
             f.write(' %6.2f$\pm$%6.2f &' % (ds.mean(), ds.std()))
-        ds = sites[SITE_ORDER[-1]]['reality-slope']['df'][key]
+        ds = SITES[SITE_ORDER[-1]]['reality-slope']['df'][key]
         f.write(' %6.2f$\pm$%6.2f \\\\\n' % (ds.mean(), ds.std()))
     f.write('rh & ')
     for site in SITE_ORDER[:-1]:
-        _df = sites[site]['reality-slope']['df']
+        _df = SITES[site]['reality-slope']['df']
         rh = rh_from_t_a_q_p(_df['theta'],
                              _df['q'] / 1000.0,
                              _df['pressure']*100.0)
         f.write(' %6.2f$\pm$%6.2f &' % (rh.mean(), rh.std()))
-    _df = sites[SITE_ORDER[-1]]['reality-slope']['df']
+    _df = SITES[SITE_ORDER[-1]]['reality-slope']['df']
     rh = rh_from_t_a_q_p(_df['theta'],
                          _df['q'] / 1000.0,
                          _df['pressure']*100.0)
     f.write(' %6.2f$\pm$%6.2f &' % (rh.mean(), rh.std()))
     f.write('ws & ')
     for site in SITE_ORDER[:-1]:
-        _df = sites[site]['reality-slope']['df']
+        _df = SITES[site]['reality-slope']['df']
         ws = np.sqrt(_df['u']**2 + _df['v']**2)
         f.write(' %6.2f$\pm$%6.2f &' % (ws.mean(), ws.std()))
-    _df = sites[SITE_ORDER[-1]]['reality-slope']['df']
+    _df = SITES[SITE_ORDER[-1]]['reality-slope']['df']
     ws = np.sqrt(_df['u']**2 + _df['v']**2)
     f.write(' %6.2f$\pm$%6.2f &' % (ws.mean(), ws.std()))
     return
 
-def site_comparison_figures(site_constants, sites):
+def site_comparison_figures():
     """Compare each site in a figure. For now, generate a spearate figure for each site"""
     for key in CONSTANT_KEYS:
         fig = plt.figure()
         ax = fig.subplots(nrows=1, ncols=1)
         sns.stripplot(x=SITE_ORDER,
-                      y=[site_constants.loc[site, key]
+                      y=[SITE_CONSTANTS.loc[site, key]
                          for site in SITE_ORDER])
         ax.set_title(key)
         ax.set_ylabel(key)
         ax.set_xlabel(key)
-    dfs = c.deque()
-    for site in SITE_ORDER:
-        dfs.append(sites[site]['reality-slope']['df'])
-    df = pd.concat(dfs, ignore_index=True)
+    df = concat_experiment('reality-slope')
     df['rh'] = rh_from_t_a_q_p(df['theta'],
                                df['q'] / 1000.0,
                                df['pressure']*100.0)
@@ -545,12 +543,101 @@ def site_comparison_figures(site_constants, sites):
         ax.set_title(key)
     return
 
+def fraction_wilt(site):
+    """Return the fraction of obs that are below wilting point for SITE"""
+    _df = SITES[site]['reality-slope']['df']
+    return (float(_df[_df.SM <
+                      float(SITE_CONSTANTS.loc[site, 'wwilt'])].shape[0])
+            / float(_df.shape[0]))
 
+def fraction_fc(site):
+    """Return the fraction of obs that are above field capcaity for SITE"""
+    _df = SITES[site]['reality-slope']['df']
+    return (float(_df[_df.SM >
+                      float(SITE_CONSTANTS.loc[site, 'wfc'])].shape[0])
+            / float(_df.shape[0]))
+
+def confounding_error(site):
+    """Return the difference in absolute error between naiv-slope and randomized
+    for SITE"""
+    err = np.absolute(SITES[site]['reality-slope']['naive_error']) -\
+          np.absolute(SITES[site]['randomized']['naive_error'])
+    return err
+
+def final_site_comparison_figures():
+    """Make a subset of final sites comparison plots. THese should be publication ready.
+
+Currently, this subset is:
+SM (w/wfc, and wwilt) (wsat is just used fo rheat transfer)
+et
+slope
+lai
+theta
+rh
+cc
+"""
+    df = concat_experiment('reality-slope')
+    df['rh'] = rh_from_t_a_q_p(df['theta'],
+                               df['q'] / 1000.0,
+                               df['pressure']*100.0)
+    df['climate'] = [SITE_CLIMATES[site] for site in df.site]
+    fig = plt.figure()
+    ax = fig.subplots(nrows=1, ncols=1)
+    ax = sns.boxplot(x='site', y='SM', data=df, order=SITE_ORDER, ax=ax,
+                     hue='climate', dodge=False)
+    ax = sns.stripplot(x='site', y='wwilt', data=SITE_CONSTANTS,
+                       ax=ax, order=SITE_ORDER, color='k')
+    ax = sns.stripplot(x='site', y='wfc', data=SITE_CONSTANTS,
+                       ax=ax, order=SITE_ORDER, color='m')
+    ax.set_title('SM')
+    ax.legend([], [], frameon=False)
+    for site in SITE_ORDER:
+        print('%s fraction below wilt : %f\n'
+              % (site, fraction_wilt(site)))
+    for key in ['ET', 'slope', 'LAI', 'theta', 'rh', 'cc']:
+        fig = plt.figure()
+        ax = fig.subplots(nrows=1, ncols=1)
+        ax = sns.boxplot(x='site', y=key, data=df, order=SITE_ORDER, ax=ax,
+                         hue='climate', dodge=False)
+        ax.set_title(key)
+        ax.legend([], [], frameon=False)
+    return True
+
+SITE_CONSTANTS = pd.read_csv('%s/site-constants.csv' % data_dir)
+SITE_CONSTANTS.set_index('site', drop=False, inplace=True)
+CONSTANT_KEYS = \
+   ['C1sat',
+    'C2ref',
+    'CLa',
+    'CLb',
+    'CLc',
+    'albedo',
+    'cveg',
+    'latt',
+    'wfc',
+    'wsat',
+    'wwilt',
+    'z0h',
+    'z0m']
+df = concat_experiment('reality-slope')
 f = open('/home/adam/dissertation/tables/table3-1.tex', 'w')
-summary_table(site_constants, sites, f)
+summary_table(f)
 f.close()
-site_comparison_figures(site_constants, sites)
+# site_comparison_figures()
+final_site_comparison_figures()
+
+# make this a scatter with site legend?
+#
+fig = plt.figure()
+ax = fig.subplots(nrows=1, ncols=1)
+ax.plot([fraction_wilt(site) for site in SITE_ORDER],
+         [confounding_error(site) for site in SITE_ORDER],
+         'k.')
+ax.set_ylabel('confounding error')
+ax.set_xlabel('fraction of obs below wilting point')
 plt.show()
+
+
 
 # hypthesis for spokane and great falls: less fraction sub wwilt than other sites
 # (and higher latitude/more seasonal cycle)
