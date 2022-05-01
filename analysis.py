@@ -14,7 +14,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.cluster import KMeans
 
 # TODO: just put in one big dataframe and use gorupby apply, etc.?
-
+CLEAN_SITES = False
 data_dir = "./data"
 
 def load_experiment(site, name):
@@ -76,7 +76,7 @@ def rank_prep(_df):
     return _df
 
 # average number of points we want per a cluster
-POINTS_PER_CLUSTER = 50
+POINTS_PER_CLUSTER = 100
 
 def classify(_df, keys, classification_key):
     """Classify each point in _DF based on rank values cooresponding to
@@ -102,8 +102,10 @@ def model_cluster(_df):
     """intended to be called on groupby, fit linear model on _DF and return slope and count"""
     m = LinearRegression()
     m.fit(X=prep_x_data(_df.SM), y=_df.ET)
+    count = np.float(_df.shape[0])
+    print('count: %f' % count)
     return pd.Series({'slope' : np.float(m.coef_),
-                      'count' : np.float(_df.shape[0])})
+                      'count' : count})
 
 def calculate_effect(grouped):
     """Calulcate causal effect from GROUPED: a dataframe of slopes and counts"""
@@ -156,8 +158,8 @@ along the way, adding slopes, etc."""
     d['true_slope'] = d['df'].slope.mean()
     d['true_slopes'] = np.array([x.slope.mean() for x in samples])
 
-    d['causal_slope'] = estimate_effect(d['df']),
-    d['causal_slopes'] = np.array([estimate_effect(_df)
+    d['cluster_slope'] = estimate_effect(d['df'])
+    d['cluster_slopes'] = np.array([estimate_effect(_df)
                                    for _df in d['samples']])
 
     return d
@@ -180,9 +182,11 @@ def model_diagnostics(d):
 
 Mutates dictionary to add diagnostic terms.
 """
-    d['naive_error'] = d['naive_slope'] - d['true_slope']
-    d['naive_errors'] = cross_product((lambda x1, x2: x1 - x2),
-                                      d['naive_slopes'], d['true_slopes'])
+    for error_type in ['naive', 'cluster']:
+        d['%s_error' % error_type] = d['%s_slope' % error_type] - d['true_slope']
+        d['%s_errors' % error_type] = [x1 - x2 for (x1, x2) in
+                                       zip(d['%s_slopes' % error_type],
+                                           d['true_slopes'])]
     return d
 
 def add_linear_regression(model, ax, name):
@@ -206,13 +210,13 @@ with regression fits overlaid"""
             ax = add_linear_regression(d['model'], ax, name)
         ax.set_title(scatter_name)
         ax.legend()
+    normalize_y_axis(*axs)
     plt.title(title)
     return
 
 # below site order is low to increasing d/et dsm, but we could also cluster by similar cliamtes, etc.
-SITE_ORDER = ['bergen', 'idar_oberstein', 'lindenberg', 'milano','kelowna',  'quad_city',
-              'spokane', 'flagstaff', 'elko', 'las_vegas', 'riverton',
-               'great_falls'  ]
+SITE_ORDER = ['bergen', 'idar_oberstein', 'lindenberg', 'milano', 'kelowna',  'quad_city',
+              'spokane', 'flagstaff', 'elko', 'las_vegas', 'riverton', 'great_falls' ]
 
 CONCATS = dict()
 def concat_experiment(key):
@@ -312,6 +316,36 @@ def slope_box_plot(title=''):
     plt.title(title)
     return
 
+def slope_causal_box_plot(title=''):
+    """make a box plot of the true vs naive slopes for each site"""
+    fig = plt.figure()
+    ax1 = fig.subplots(nrows=1, ncols=1)
+    dfs = c.deque()
+    for (site, experiments) in SITES.items():
+        d = experiments['reality-slope']
+        _df = pd.DataFrame(d['naive_slopes'], columns=['dET/dSM'])
+        _df['slope type'] = 'naive'
+        _df['site'] = site
+        dfs.append(_df)
+        _df = pd.DataFrame(d['cluster_slopes'],
+                           columns=['dET/dSM'])
+        _df['slope type'] = 'clustered adjustment'
+        _df['site'] = site
+        dfs.append(_df)
+        _df = pd.DataFrame(d['true_slopes'],
+                           columns=['dET/dSM'])
+        _df['slope type'] = 'truth'
+        _df['site'] = site
+        dfs.append(_df)
+    df = pd.concat(dfs, ignore_index=True)
+    ax1 = sns.boxplot(x='site', y='dET/dSM', hue='slope type', data=df,
+                      order=SITE_ORDER, ax=ax1)
+    ax1.set_ylabel('dET/dSM (slope)')
+    ax1.set_xlabel('Site')
+    plt.legend()
+    plt.title(title)
+    return
+
 def error_plot_absolute(title=''):
     """make a box plot of error due to confounding and specification"""
     fig, ax = plt.subplots()
@@ -367,7 +401,7 @@ stations = pickle.load(f)
 f.close()
 
 SITES = dict()
-CLEAN_SITES = False
+
 
 for site in stations.keys():
     if CLEAN_SITES and os.path.exists(pkl_path(site)):
@@ -386,7 +420,8 @@ for (site, experiments) in SITES.items():
     print('max site: %f' % experiments['reality-slope']['df']['sum_squared_error'].max())
     print('max site: %f\n' % experiments['randomized']['df']['sum_squared_error'].max())
 
-    # scatter_plot(experiments, title=site)
+    if site in {'spokane', 'flagstaff', 'elko', 'las_vegas', 'riverton', 'great_falls'}:
+        scatter_plot(experiments, title=site)
 
 
 # sites where the slope is biased high (but these also usually
@@ -594,6 +629,9 @@ cc
     for site in SITE_ORDER:
         print('%s fraction below wilt : %f\n'
               % (site, fraction_wilt(site)))
+        print('%s fraction above fc : %f\n'
+              % (site, fraction_fc(site)))
+
     for key in ['ET', 'slope', 'LAI', 'theta', 'rh', 'cc']:
         fig = plt.figure()
         ax = fig.subplots(nrows=1, ncols=1)
@@ -635,6 +673,7 @@ ax.plot([fraction_wilt(site) for site in SITE_ORDER],
          'k.')
 ax.set_ylabel('confounding error')
 ax.set_xlabel('fraction of obs below wilting point')
+slope_causal_box_plot()
 plt.show()
 
 
