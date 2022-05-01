@@ -14,8 +14,25 @@ from sklearn.linear_model import LinearRegression
 from sklearn.cluster import KMeans
 
 # TODO: just put in one big dataframe and use gorupby apply, etc.?
-CLEAN_SITES = False
+CLEAN_SITES = True
 data_dir = "./data"
+
+SITE_CONSTANTS = pd.read_csv('%s/site-constants.csv' % data_dir)
+SITE_CONSTANTS.set_index('site', drop=False, inplace=True)
+CONSTANT_KEYS = \
+   ['C1sat',
+    'C2ref',
+    'CLa',
+    'CLb',
+    'CLc',
+    'albedo',
+    'cveg',
+    'latt',
+    'wfc',
+    'wsat',
+    'wwilt',
+    'z0h',
+    'z0m']
 
 def load_experiment(site, name):
     """Load experiment cooresponding to SITE and NAME."""
@@ -119,49 +136,82 @@ def prep_effect(_df):
 """
     return assign_clusters(rank_prep(_df))
 
-def estimate_effect(_df):
-    """Perform last 2 steps in my causal estimatation method:
-
+def cluster_effect(_df):
+    """Perform 4 steps in my causal estimatation method:
+1. Rank each confounder we're adjusting for.
+2. Assign each point a cluster based on rankings ("match").
 3. Group by each cluster and calcualte a slope.
 4. Calculate the average slope, weighted by the number of points in each cluster.
 """
+    _df = _df.copy(deep=True)
+    _df = prep_effect(_df)
     return calculate_effect(_df.groupby('cluster')\
                             .apply(model_cluster))
 
-def fit_models(d):
-    """fit models and calculate slopes for D.
+def naive_regression(_df):
+    """Calulcate a naive regression on _df. Return the slope.
 
-D is a dictionary with a 'df' key. D will be mutated
-along the way, adding slopes, etc."""
-    _df = d['df'].groupby(['year', 'doy']).apply(true_slope)
-    shape0 = _df.shape[0]
-    _df = _df[(~np.isnan(_df.slope)) & (_df['sum_squared_error'] <= 100.0)]
-    print("Fraction of obs removed: %f\n" % (float(shape0 - _df.shape[0])/shape0))
-    d['df'] = _df
-    samples = [d['df'].sample(n=d['df'].shape[0],
+In the future we could return the model, or a (slope, intercept)
+tuple"""
+    m = LinearRegression()
+    m.fit(X=prep_x_data(_df.SM), y=_df.ET)
+    return float(m.coef_)
+
+def expert_naive_regression(_df, site):
+    """Calulcate a naive regression on _df but using expert guidance to
+account for areas we know dET/dSM = 0 (SM < wilt, SM > wilt).
+
+Basically set the slope equal to zero for all of those areas.
+"""
+    wwilt = SITE_CONSTANTS.loc[site, 'wwilt']
+    wfc = SITE_CONSTANTS.loc[site, 'wfc']
+    full_size = float(_df.shape[0])
+    _df = _df[(_df.SM > wwilt) & (_df.SM < wfc)]
+    m = LinearRegression()
+    m.fit(X=prep_x_data(_df.SM), y=_df.ET)
+    return (float(m.coef_) * float(_df.shape[0]) / full_size)
+
+def expert_cluster_effect(_df, site):
+    """Calulcate a a causal effect on _df but using expert guidance to
+account for areas we know dET/dSM = 0 (SM < wilt, SM > wilt).
+
+Basically set the slope equal to zero for all of those areas.
+"""
+    wwilt = SITE_CONSTANTS.loc[site, 'wwilt']
+    wfc = SITE_CONSTANTS.loc[site, 'wfc']
+    full_size = float(_df.shape[0])
+    _df = _df[(_df.SM > wwilt) & (_df.SM < wfc)]
+    return (cluster_effect(_df) * float(_df.shape[0]) / full_size)
+
+def fit_models(site, name):
+    """fit models and calculate slopes for SITE and experiment NAME.
+
+Returns a dicntionary with data and slopes."""
+    df = load_experiment(site, name)
+    df = df.groupby(['year', 'doy']).apply(true_slope)
+    shape0 = df.shape[0]
+    df = df[(~np.isnan(df.slope)) & (df['sum_squared_error'] <= 100.0)]
+    print("Fraction of obs removed: %f\n" % (float(shape0 - df.shape[0])/shape0))
+    samples = [df.sample(n=df.shape[0],
                               replace=True,
                               random_state=i)
                for i in range(NSAMPLE)]
-    models = [LinearRegression() for i in range(NSAMPLE)]
-    for m,df in zip(models,samples):
-        m.fit(X=prep_x_data(df.SM), y=df.ET)
-    model = LinearRegression()
-    model.fit(X=prep_x_data(d['df'].SM), y=d['df'].ET)
+    d = dict()
+    d['naive_slope'] = naive_regression(df)
+    d['naive_slopes'] = np.array([naive_regression(_df) for _df in samples])
+    d['expert_naive_slope'] = expert_naive_regression(df, site)
+    d['expert_naive_slopes'] =\
+        np.array([expert_naive_regression(_df, site) for _df in samples])
+    d['true_slope'] = df.slope.mean()
+    d['true_slopes'] = np.array([_df.slope.mean() for _df in samples])
+    d['cluster_slope'] = cluster_effect(df)
+    d['cluster_slopes'] = np.array([cluster_effect(_df)
+                                    for _df in samples])
+    d['expert_cluster_slope'] = expert_cluster_effect(df, site)
+    d['expert_cluster_slopes'] = np.array([expert_cluster_effect(_df, site)
+                                           for _df in samples])
+    d['df'] = df
     d['samples'] = samples
-    d['models'] = models
-    d['model'] = model
-    d['naive_slope'] = model.coef_
-    d['naive_slopes'] = np.array([float(m.coef_) for m in models])
-
-    d['df'] = prep_effect(_df)
-    d['samples'] = [prep_effect(_df) for _df in d['samples']]
-    d['true_slope'] = d['df'].slope.mean()
-    d['true_slopes'] = np.array([x.slope.mean() for x in samples])
-
-    d['cluster_slope'] = estimate_effect(d['df'])
-    d['cluster_slopes'] = np.array([estimate_effect(_df)
-                                   for _df in d['samples']])
-
     return d
 
 
@@ -206,8 +256,6 @@ with regression fits overlaid"""
     for (ax, scatter_name) in zip(axs, experiments.keys()):
         ax = sns.scatterplot(data=experiments[scatter_name]['df'],
                                 x='SM', y='ET', hue='slope', ax=ax)
-        for (name, d) in experiments.items():
-            ax = add_linear_regression(d['model'], ax, name)
         ax.set_title(scatter_name)
         ax.legend()
     normalize_y_axis(*axs)
@@ -276,7 +324,7 @@ As a side effect, may write a pickle file to data/SITE.pkl"""
         experiments = dict()
         for name in experiment_names:
             experiments[name] = model_diagnostics(
-                fit_models({'df' : load_experiment(site, name)}))
+                fit_models(site, name))
         f = open(pkl_path(site), 'wb')
         pickle.dump(experiments, f)
         f.close()
@@ -327,11 +375,25 @@ def slope_causal_box_plot(title=''):
         _df['slope type'] = 'naive'
         _df['site'] = site
         dfs.append(_df)
+
+        _df = pd.DataFrame(d['expert_naive_slopes'],
+                           columns=['dET/dSM'])
+        _df['slope type'] = 'expert naive'
+        _df['site'] = site
+        dfs.append(_df)
+
         _df = pd.DataFrame(d['cluster_slopes'],
                            columns=['dET/dSM'])
         _df['slope type'] = 'clustered adjustment'
         _df['site'] = site
         dfs.append(_df)
+
+        _df = pd.DataFrame(d['expert_cluster_slopes'],
+                           columns=['dET/dSM'])
+        _df['slope type'] = 'expert clustered adjustment'
+        _df['site'] = site
+        dfs.append(_df)
+
         _df = pd.DataFrame(d['true_slopes'],
                            columns=['dET/dSM'])
         _df['slope type'] = 'truth'
@@ -339,7 +401,9 @@ def slope_causal_box_plot(title=''):
         dfs.append(_df)
     df = pd.concat(dfs, ignore_index=True)
     ax1 = sns.boxplot(x='site', y='dET/dSM', hue='slope type', data=df,
-                      order=SITE_ORDER, ax=ax1)
+                      order=SITE_ORDER, ax=ax1,
+                      hue_order=['naive', 'expert naive', 'clustered adjustment',
+                                 'expert clustered adjustment', 'truth'])
     ax1.set_ylabel('dET/dSM (slope)')
     ax1.set_xlabel('Site')
     plt.legend()
@@ -641,22 +705,6 @@ cc
         ax.legend([], [], frameon=False)
     return True
 
-SITE_CONSTANTS = pd.read_csv('%s/site-constants.csv' % data_dir)
-SITE_CONSTANTS.set_index('site', drop=False, inplace=True)
-CONSTANT_KEYS = \
-   ['C1sat',
-    'C2ref',
-    'CLa',
-    'CLb',
-    'CLc',
-    'albedo',
-    'cveg',
-    'latt',
-    'wfc',
-    'wsat',
-    'wwilt',
-    'z0h',
-    'z0m']
 df = concat_experiment('reality-slope')
 f = open('/home/adam/dissertation/tables/table3-1.tex', 'w')
 summary_table(f)
