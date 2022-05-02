@@ -13,8 +13,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from sklearn.cluster import KMeans
 
-# TODO: just put in one big dataframe and use gorupby apply, etc.?
-CLEAN_SITES = True
+CLEAN_SITES = False
 data_dir = "./data"
 
 SITE_CONSTANTS = pd.read_csv('%s/site-constants.csv' % data_dir)
@@ -92,27 +91,36 @@ def rank_prep(_df):
         _df[rank_key(key)] = _df[key].rank()
     return _df
 
+def normalized_key(key):
+    """return the normalized key from a standard key"""
+    return '%s_normalized' % key
+
+def normalized_prep(_df):
+    """alternate Step 1 in my causal analysis that is more "mainstream":
+
+normalize each variable"""
+    for key in CONTROL_KEYS:
+        _df[normalized_key(key)] = (_df[key] - _df[key].mean())/_df[key].std()
+    return _df
+
 # average number of points we want per a cluster
 POINTS_PER_CLUSTER = 100
 
-def classify(_df, keys, classification_key):
+def assign_clusters(_df, keys, classification_key, key_mapper):
     """Classify each point in _DF based on rank values cooresponding to
-    KEY, and assign classification to CLASSIFICATION_KEY
+    KEY, and assign classification to CLASSIFICATION_KEY.
+
+    KEY_MAPPER is a function that maps a key to the metric by which we are clustering.
     """
     n_clusters = np.int(np.floor(float(_df.shape[0]) / float(POINTS_PER_CLUSTER)))
     max_iter=1000
     model = KMeans(n_clusters=n_clusters, max_iter=max_iter, algorithm="full",
                    random_state=0)
-    xs = _df[list(map(rank_key, keys))].values
+    xs = _df[list(map(key_mapper, keys))].values
     model.fit(xs)
     if model.n_iter_ == max_iter:
         raise Exception('ERORR: max iterations reached when iftting model on %s' % classification_key)
     _df[classification_key] = model.predict(xs)
-    return _df
-
-def assign_clusters(_df):
-    """Add all clusters to _DF"""
-    _df = classify(_df, CONTROL_KEYS, 'cluster')
     return _df
 
 def model_cluster(_df):
@@ -120,21 +128,13 @@ def model_cluster(_df):
     m = LinearRegression()
     m.fit(X=prep_x_data(_df.SM), y=_df.ET)
     count = np.float(_df.shape[0])
-    print('count: %f' % count)
+    # print('count: %f' % count)
     return pd.Series({'slope' : np.float(m.coef_),
                       'count' : count})
 
 def calculate_effect(grouped):
     """Calulcate causal effect from GROUPED: a dataframe of slopes and counts"""
     return (grouped['slope'] * grouped['count']).sum()/grouped['count'].sum()
-
-def prep_effect(_df):
-    """Perform the first 2 steps in my causal estimation method:
-
-1. Rank each confounder we're adjusting for.
-2. Assign each point a cluster based on rankings ("match").
-"""
-    return assign_clusters(rank_prep(_df))
 
 def cluster_effect(_df):
     """Perform 4 steps in my causal estimatation method:
@@ -144,8 +144,23 @@ def cluster_effect(_df):
 4. Calculate the average slope, weighted by the number of points in each cluster.
 """
     _df = _df.copy(deep=True)
-    _df = prep_effect(_df)
+    _df = assign_clusters(rank_prep(_df), CONTROL_KEYS, 'cluster', rank_key)
     return calculate_effect(_df.groupby('cluster')\
+                            .apply(model_cluster))
+
+def cluster_normalized_effect(_df):
+    """Perform alternate 4 steps in my causal estimatation method:
+1. Normalize each confounder we're adjusting for. (this is more
+   accepted method, but makes less snes to me for "nearness"
+2. Assign each point a cluster based on rankings ("match").
+3. Group by each cluster and calcualte a slope.
+4. Calculate the average slope, weighted by the number of points in each cluster.
+
+    """
+    _df = _df.copy(deep=True)
+    _df = assign_clusters(normalized_prep(_df), CONTROL_KEYS,
+                          'cluster_normalized', normalized_key)
+    return calculate_effect(_df.groupby('cluster_normalized')\
                             .apply(model_cluster))
 
 def naive_regression(_df):
@@ -191,7 +206,7 @@ Returns a dicntionary with data and slopes."""
     df = df.groupby(['year', 'doy']).apply(true_slope)
     shape0 = df.shape[0]
     df = df[(~np.isnan(df.slope)) & (df['sum_squared_error'] <= 100.0)]
-    print("Fraction of obs removed: %f\n" % (float(shape0 - df.shape[0])/shape0))
+    # print("Fraction of obs removed: %f\n" % (float(shape0 - df.shape[0])/shape0))
     samples = [df.sample(n=df.shape[0],
                               replace=True,
                               random_state=i)
@@ -207,6 +222,10 @@ Returns a dicntionary with data and slopes."""
     d['cluster_slope'] = cluster_effect(df)
     d['cluster_slopes'] = np.array([cluster_effect(_df)
                                     for _df in samples])
+    d['cluster_normalized_slope'] = cluster_normalized_effect(df)
+    d['cluster_normalized_slopes'] = np.array([cluster_normalized_effect(_df)
+                                               for _df in samples])
+
     d['expert_cluster_slope'] = expert_cluster_effect(df, site)
     d['expert_cluster_slopes'] = np.array([expert_cluster_effect(_df, site)
                                            for _df in samples])
@@ -232,7 +251,7 @@ def model_diagnostics(d):
 
 Mutates dictionary to add diagnostic terms.
 """
-    for error_type in ['naive', 'cluster']:
+    for error_type in ['naive', 'cluster', 'cluster_normalized']:
         d['%s_error' % error_type] = d['%s_slope' % error_type] - d['true_slope']
         d['%s_errors' % error_type] = [x1 - x2 for (x1, x2) in
                                        zip(d['%s_slopes' % error_type],
@@ -364,52 +383,6 @@ def slope_box_plot(title=''):
     plt.title(title)
     return
 
-def slope_causal_box_plot(title=''):
-    """make a box plot of the true vs naive slopes for each site"""
-    fig = plt.figure()
-    ax1 = fig.subplots(nrows=1, ncols=1)
-    dfs = c.deque()
-    for (site, experiments) in SITES.items():
-        d = experiments['reality-slope']
-        _df = pd.DataFrame(d['naive_slopes'], columns=['dET/dSM'])
-        _df['slope type'] = 'naive'
-        _df['site'] = site
-        dfs.append(_df)
-
-        _df = pd.DataFrame(d['expert_naive_slopes'],
-                           columns=['dET/dSM'])
-        _df['slope type'] = 'expert naive'
-        _df['site'] = site
-        dfs.append(_df)
-
-        _df = pd.DataFrame(d['cluster_slopes'],
-                           columns=['dET/dSM'])
-        _df['slope type'] = 'clustered adjustment'
-        _df['site'] = site
-        dfs.append(_df)
-
-        _df = pd.DataFrame(d['expert_cluster_slopes'],
-                           columns=['dET/dSM'])
-        _df['slope type'] = 'expert clustered adjustment'
-        _df['site'] = site
-        dfs.append(_df)
-
-        _df = pd.DataFrame(d['true_slopes'],
-                           columns=['dET/dSM'])
-        _df['slope type'] = 'truth'
-        _df['site'] = site
-        dfs.append(_df)
-    df = pd.concat(dfs, ignore_index=True)
-    ax1 = sns.boxplot(x='site', y='dET/dSM', hue='slope type', data=df,
-                      order=SITE_ORDER, ax=ax1,
-                      hue_order=['naive', 'expert naive', 'clustered adjustment',
-                                 'expert clustered adjustment', 'truth'])
-    ax1.set_ylabel('dET/dSM (slope)')
-    ax1.set_xlabel('Site')
-    plt.legend()
-    plt.title(title)
-    return
-
 def error_plot_absolute(title=''):
     """make a box plot of error due to confounding and specification"""
     fig, ax = plt.subplots()
@@ -428,6 +401,79 @@ def error_plot_absolute(title=''):
     df = pd.concat(dfs, ignore_index=True)
     ax = sns.boxplot(x='site', y='dET/dSM error', hue='error type', data=df,
                      order=SITE_ORDER)
+    ax.set_ylabel('dET/dSM absolute error')
+    ax.set_xlabel('Site')
+    plt.legend()
+    plt.title(title)
+    return
+
+
+def slope_adjustment_box_plot(title=''):
+    """make a box plot of the true vs adjusted slopes for each site"""
+    fig = plt.figure()
+    ax1 = fig.subplots(nrows=1, ncols=1)
+    dfs = c.deque()
+    for (site, experiments) in SITES.items():
+        d = experiments['reality-slope']
+        _df = pd.DataFrame(d['naive_slopes'], columns=['dET/dSM'])
+        _df['slope type'] = 'naive'
+        _df['site'] = site
+        dfs.append(_df)
+
+        _df = pd.DataFrame(d['cluster_slopes'],
+                           columns=['dET/dSM'])
+        _df['slope type'] = 'clustered adjustment'
+        _df['site'] = site
+        dfs.append(_df)
+
+        _df = pd.DataFrame(d['cluster_normalized_slopes'],
+                           columns=['dET/dSM'])
+        _df['slope type'] = '(c) normalized'
+        _df['site'] = site
+        dfs.append(_df)
+
+        _df = pd.DataFrame(d['true_slopes'],
+                           columns=['dET/dSM'])
+        _df['slope type'] = 'truth'
+        _df['site'] = site
+        dfs.append(_df)
+    df = pd.concat(dfs, ignore_index=True)
+    ax1 = sns.boxplot(x='site', y='dET/dSM', hue='slope type', data=df,
+                      order=SITE_ORDER, ax=ax1,
+                      hue_order=['naive', 'clustered adjustment',
+                                 '(c) normalized', 'truth'])
+    ax1.set_ylabel('dET/dSM (slope)')
+    ax1.set_xlabel('Site')
+    plt.legend()
+    plt.title(title)
+    return
+
+def error_adjustment_plot_absolute(title=''):
+    """make a box plot of error due to confounding and specification"""
+    fig, ax = plt.subplots()
+    dfs = c.deque()
+    for (site, experiments) in SITES.items():
+        _df = pd.DataFrame(np.absolute(experiments['reality-slope']['naive_errors']),
+                           columns=['dET/dSM error'])
+        _df['error type'] = 'naive'
+        _df['site'] = site
+        dfs.append(_df)
+
+        _df = pd.DataFrame(np.absolute(experiments['reality-slope']['cluster_errors']),
+                           columns=['dET/dSM error'])
+        _df['error type'] = 'clustered adjustment'
+        _df['site'] = site
+        dfs.append(_df)
+
+        _df = pd.DataFrame(np.absolute(experiments['reality-slope']['cluster_normalized_errors']),
+                           columns=['dET/dSM error'])
+        _df['error type'] = '(c) normalized'
+        _df['site'] = site
+        dfs.append(_df)
+    df = pd.concat(dfs, ignore_index=True)
+    ax = sns.boxplot(x='site', y='dET/dSM error', hue='error type', data=df,
+                     order=SITE_ORDER,
+                     hue_order=['naive', 'clustered adjustment', '(c) normalized'])
     ax.set_ylabel('dET/dSM absolute error')
     ax.set_xlabel('Site')
     plt.legend()
@@ -474,18 +520,14 @@ for site in stations.keys():
     SITES[site] = site_analysis(site)
 
 
-slope_box_plot()
-# slope_fit_plot()
-# error_plot()
-error_plot_absolute()
 
-for (site, experiments) in SITES.items():
-    print("*****%s******" % site)
-    print('max site: %f' % experiments['reality-slope']['df']['sum_squared_error'].max())
-    print('max site: %f\n' % experiments['randomized']['df']['sum_squared_error'].max())
+# for (site, experiments) in SITES.items():
+#     print("*****%s******" % site)
+#     print('max site: %f' % experiments['reality-slope']['df']['sum_squared_error'].max())
+#     print('max site: %f\n' % experiments['randomized']['df']['sum_squared_error'].max())
 
-    if site in {'spokane', 'flagstaff', 'elko', 'las_vegas', 'riverton', 'great_falls'}:
-        scatter_plot(experiments, title=site)
+#     if site in {'spokane', 'flagstaff', 'elko', 'las_vegas', 'riverton', 'great_falls'}:
+#         scatter_plot(experiments, title=site)
 
 
 # sites where the slope is biased high (but these also usually
@@ -666,7 +708,10 @@ def confounding_error(site):
 def final_site_comparison_figures():
     """Make a subset of final sites comparison plots. THese should be publication ready.
 
-Currently, this subset is:
+Currently, this subset is: (we really probably just wantt thist o be
+SM in the end, and part of the other panel fig with slope estiamtes
+and error
+
 SM (w/wfc, and wwilt) (wsat is just used fo rheat transfer)
 et
 slope
@@ -674,7 +719,8 @@ lai
 theta
 rh
 cc
-"""
+
+    """
     df = concat_experiment('reality-slope')
     df['rh'] = rh_from_t_a_q_p(df['theta'],
                                df['q'] / 1000.0,
@@ -714,17 +760,19 @@ final_site_comparison_figures()
 
 # make this a scatter with site legend?
 #
-fig = plt.figure()
-ax = fig.subplots(nrows=1, ncols=1)
-ax.plot([fraction_wilt(site) for site in SITE_ORDER],
-         [confounding_error(site) for site in SITE_ORDER],
-         'k.')
-ax.set_ylabel('confounding error')
-ax.set_xlabel('fraction of obs below wilting point')
-slope_causal_box_plot()
+# fig = plt.figure()
+# ax = fig.subplots(nrows=1, ncols=1)
+# ax.plot([fraction_wilt(site) for site in SITE_ORDER],
+#          [confounding_error(site) for site in SITE_ORDER],
+#          'k.')
+# ax.set_ylabel('confounding error')
+# ax.set_xlabel('fraction of obs below wilting point')
+
+slope_box_plot()
+error_plot_absolute()
+slope_adjustment_box_plot()
+error_adjustment_plot_absolute()
 plt.show()
-
-
 
 # hypthesis for spokane and great falls: less fraction sub wwilt than other sites
 # (and higher latitude/more seasonal cycle)
