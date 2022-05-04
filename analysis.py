@@ -106,13 +106,17 @@ normalize each variable"""
 # average number of points we want per a cluster
 POINTS_PER_CLUSTER = 100
 
-def assign_clusters(_df, keys, classification_key, key_mapper):
+def n_clusters_f(_df):
+    """return number of clusters from a dataframe's sample size"""
+    return np.int(np.floor(float(_df.shape[0]) / float(POINTS_PER_CLUSTER)))
+def assign_clusters(_df, keys, classification_key, key_mapper, n_clusters=False):
     """Classify each point in _DF based on rank values cooresponding to
     KEY, and assign classification to CLASSIFICATION_KEY.
 
     KEY_MAPPER is a function that maps a key to the metric by which we are clustering.
     """
-    n_clusters = np.int(np.floor(float(_df.shape[0]) / float(POINTS_PER_CLUSTER)))
+    if not n_clusters:
+        n_clusters = n_clusters_f(_df)
     max_iter=1000
     model = KMeans(n_clusters=n_clusters, max_iter=max_iter, algorithm="full",
                    random_state=0)
@@ -148,7 +152,7 @@ def cluster_effect(_df):
     return calculate_effect(_df.groupby('cluster')\
                             .apply(model_cluster))
 
-def cluster_normalized_effect(_df):
+def cluster_normalized_effect(_df, n_clusters=False):
     """Perform alternate 4 steps in my causal estimatation method:
 1. Normalize each confounder we're adjusting for. (this is more
    accepted method, but makes less snes to me for "nearness"
@@ -159,7 +163,8 @@ def cluster_normalized_effect(_df):
     """
     _df = _df.copy(deep=True)
     _df = assign_clusters(normalized_prep(_df), CONTROL_KEYS,
-                          'cluster_normalized', normalized_key)
+                          'cluster_normalized', normalized_key,
+                          n_clusters)
     return calculate_effect(_df.groupby('cluster_normalized')\
                             .apply(model_cluster))
 
@@ -206,9 +211,9 @@ Basically set the slope equal to zero for all of those areas.
 """
     wwilt = SITE_CONSTANTS.loc[site, 'wwilt']
     wfc = SITE_CONSTANTS.loc[site, 'wfc']
-    full_size = float(_df.shape[0])
-    _df = _df[(_df.SM > wwilt) & (_df.SM < wfc)]
-    return (cluster_normalized_effect(_df) * float(_df.shape[0]) / full_size)
+    _df_subset = _df[(_df.SM > wwilt) & (_df.SM < wfc)]
+    return (cluster_normalized_effect(_df_subset, n_clusters_f(_df))
+            * float(_df_subset.shape[0]) / float(_df.shape[0]))
 
 def fit_models(site, name):
     """fit models and calculate slopes for SITE and experiment NAME.
@@ -434,23 +439,18 @@ def slope_adjustment_box_plot(title=''):
         _df['site'] = site
         dfs.append(_df)
 
-        _df = pd.DataFrame(d['cluster_slopes'],
+        _df = pd.DataFrame(d['cluster_normalized_slopes'],
                            columns=['dET/dSM'])
-        _df['slope type'] = 'clustered adjustment'
+        _df['slope type'] = 'adjusted'
         _df['site'] = site
         dfs.append(_df)
 
-        _df = pd.DataFrame(d['cluster_normalized_slopes'],
+        # if site in ['elko', 'las_vegas']:
+        _df = pd.DataFrame(d['expert_cluster_normalized_slopes'],
                            columns=['dET/dSM'])
-        _df['slope type'] = '(c) normalized'
+        _df['slope type'] = 'adjusted\nw/ expert'
         _df['site'] = site
         dfs.append(_df)
-        if site in ['elko', 'las_vegas']:
-            _df = pd.DataFrame(d['expert_cluster_normalized_slopes'],
-                               columns=['dET/dSM'])
-            _df['slope type'] = 'normalized w/ expert'
-            _df['site'] = site
-            dfs.append(_df)
 
         _df = pd.DataFrame(d['true_slopes'],
                            columns=['dET/dSM'])
@@ -460,8 +460,7 @@ def slope_adjustment_box_plot(title=''):
     df = pd.concat(dfs, ignore_index=True)
     ax1 = sns.boxplot(x='site', y='dET/dSM', hue='slope type', data=df,
                       order=SITE_ORDER, ax=ax1,
-                      hue_order=['naive', 'clustered adjustment',
-                                 '(c) normalized',  'normalized w/ expert', 'truth'])
+                      hue_order=['naive', 'adjusted', 'adjusted\nw/ expert', 'truth'])
     ax1.set_ylabel('dET/dSM (slope)')
     ax1.set_xlabel('Site')
     plt.legend()
@@ -480,30 +479,24 @@ def error_adjustment_plot_absolute(title=''):
         _df['site'] = site
         dfs.append(_df)
 
-        _df = pd.DataFrame(np.absolute(d['cluster_errors']),
-                           columns=['dET/dSM error'])
-        _df['error type'] = 'clustered adjustment'
-        _df['site'] = site
-        dfs.append(_df)
-
-        if site in ['elko', 'las_vegas']:
-            _df = pd.DataFrame(d['expert_cluster_normalized_errors'],
-                               columns=['dET/dSM'])
-            _df['error type'] = 'normalized w/ expert'
-            _df['site'] = site
-            dfs.append(_df)
-
 
         _df = pd.DataFrame(np.absolute(d['cluster_normalized_errors']),
                            columns=['dET/dSM error'])
-        _df['error type'] = '(c) normalized'
+        _df['error type'] = 'adjusted'
         _df['site'] = site
         dfs.append(_df)
+
+        # if site in ['elko', 'las_vegas']:
+        _df = pd.DataFrame(np.absolute(d['expert_cluster_normalized_errors']),
+                           columns=['dET/dSM'])
+        _df['error type'] = 'adjusted\nw/ expert'
+        _df['site'] = site
+        dfs.append(_df)
+
     df = pd.concat(dfs, ignore_index=True)
     ax = sns.boxplot(x='site', y='dET/dSM error', hue='error type', data=df,
                      order=SITE_ORDER,
-                     hue_order=['naive', 'clustered adjustment',
-                                '(c) normalized', 'normalized w/ expert']
+                     # hue_order=['naive', 'adjusted', 'adjusted\nw/ expert']
                      )
     ax.set_ylabel('dET/dSM absolute error')
     ax.set_xlabel('Site')
@@ -553,13 +546,18 @@ for site in stations.keys():
 
 
 # for (site, experiments) in SITES.items():
-#     print("*****%s******" % site)
-#     print('max site: %f' % experiments['reality-slope']['df']['sum_squared_error'].max())
-#     print('max site: %f\n' % experiments['randomized']['df']['sum_squared_error'].max())
+    # print("*****%s******" % site)
+    # print('max site: %f' % experiments['reality-slope']['df']['sum_squared_error'].max())
+    # print('max site: %f\n' % experiments['randomized']['df']['sum_squared_error'].max())
 
-#     if site in {'spokane', 'flagstaff', 'elko', 'las_vegas', 'riverton', 'great_falls'}:
-#         scatter_plot(experiments, title=site)
+    # if site in {'spokane', 'flagstaff', 'elko', 'las_vegas', 'riverton', 'great_falls'}:
+    #     scatter_plot(experiments, title=site)
 
+for site in SITE_ORDER:
+    print('%s fraction below wilt : %f\n'
+          % (site, fraction_wilt(site)))
+    print('%s fraction above fc : %f\n'
+          % (site, fraction_fc(site)))
 
 # sites where the slope is biased high (but these also usually
 # have slightly lower error as well)
@@ -767,11 +765,6 @@ cc
                        ax=ax, order=SITE_ORDER, color='m')
     ax.set_title('SM')
     ax.legend([], [], frameon=False)
-    for site in SITE_ORDER:
-        print('%s fraction below wilt : %f\n'
-              % (site, fraction_wilt(site)))
-        print('%s fraction above fc : %f\n'
-              % (site, fraction_fc(site)))
 
     for key in ['ET', 'slope', 'LAI', 'theta', 'rh', 'cc']:
         fig = plt.figure()
