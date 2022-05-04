@@ -7,6 +7,7 @@ import sys
 import collections as c
 import seaborn as sns
 import random
+import warnings
 sns.set_theme()
 
 from sklearn.model_selection import train_test_split
@@ -32,6 +33,8 @@ CONSTANT_KEYS = \
     'wwilt',
     'z0h',
     'z0m']
+
+RANDOM_STATE = np.random.RandomState(0)
 
 def load_experiment(site, name):
     """Load experiment cooresponding to SITE and NAME."""
@@ -73,23 +76,13 @@ def true_slope(_df):
 
 NSAMPLE = 50 # for bootstrap
 
-ATM_KEYS = {'theta', 'advtheta', 'q', 'advq', 'cc', 'u', 'v', 'h', 'pressure', 'day'}
+ATM_KEYS = {'theta', 'advtheta', 'q', 'advq', 'cc', 'ws', 'h', 'day'}
 LAND_KEYS = {'T2', 'Tsoil', 'Ts', 'LAI'} # should we include SM here?
                                          # it taints the idea of
                                          # matching, but makes sense
                                          # with the idea of piecewise
                                          # linear
 CONTROL_KEYS = ATM_KEYS.union(LAND_KEYS)
-
-def rank_key(key):
-    """return the rank key from a standard key"""
-    return '%s_rank' % key
-
-def rank_prep(_df):
-    """Step 1 in my causal analysis: rank each variable"""
-    for key in CONTROL_KEYS:
-        _df[rank_key(key)] = _df[key].rank()
-    return _df
 
 def normalized_key(key):
     """return the normalized key from a standard key"""
@@ -104,13 +97,10 @@ normalize each variable"""
     return _df
 
 # average number of points we want per a cluster
-POINTS_PER_CLUSTER = 100
-
-def n_clusters_f(_df):
-    """return number of clusters from a dataframe's sample size"""
-    return np.int(np.floor(float(_df.shape[0]) / float(POINTS_PER_CLUSTER)))
+MIN_POINTS_PER_CLUSTER = 6
+# MAX_CLUSTERS = 20
 def assign_clusters(_df, keys, classification_key, key_mapper, n_clusters=False):
-    """Classify each point in _DF based on rank values cooresponding to
+    """Classify each point in _DF based on values cooresponding to
     KEY, and assign classification to CLASSIFICATION_KEY.
 
     KEY_MAPPER is a function that maps a key to the metric by which we are clustering.
@@ -119,13 +109,13 @@ def assign_clusters(_df, keys, classification_key, key_mapper, n_clusters=False)
         n_clusters = n_clusters_f(_df)
     max_iter=1000
     model = KMeans(n_clusters=n_clusters, max_iter=max_iter, algorithm="full",
-                   random_state=0)
+                   random_state=RANDOM_STATE)
     xs = _df[list(map(key_mapper, keys))].values
     model.fit(xs)
     if model.n_iter_ == max_iter:
         raise Exception('ERORR: max iterations reached when iftting model on %s' % classification_key)
     _df[classification_key] = model.predict(xs)
-    return _df
+    return (_df, (lambda df: model.predict(df[list(map(key_mapper, keys))].values)))
 
 def model_cluster(_df):
     """intended to be called on groupby, fit linear model on _DF and return slope and count"""
@@ -134,25 +124,101 @@ def model_cluster(_df):
     count = np.float(_df.shape[0])
     # print('count: %f' % count)
     return pd.Series({'slope' : np.float(m.coef_),
-                      'count' : count})
+                      'count' : count,
+                      'model' : m})
+
+def error_cluster(_df, model):
+    """intended to be called on groupby cluster, return error associated with cluster """
+    cluster =  _df.iloc[0]['cluster']
+    m = model.loc[cluster]['model']
+    return np.sum((np.squeeze(m.predict(X=prep_x_data(_df.SM))) - _df.ET)**2)
 
 def calculate_effect(grouped):
     """Calulcate causal effect from GROUPED: a dataframe of slopes and counts"""
     return (grouped['slope'] * grouped['count']).sum()/grouped['count'].sum()
 
-def cluster_effect(_df):
-    """Perform 4 steps in my causal estimatation method:
-1. Rank each confounder we're adjusting for.
-2. Assign each point a cluster based on rankings ("match").
-3. Group by each cluster and calcualte a slope.
-4. Calculate the average slope, weighted by the number of points in each cluster.
-"""
-    _df = _df.copy(deep=True)
-    _df = assign_clusters(rank_prep(_df), CONTROL_KEYS, 'cluster', rank_key)
-    return calculate_effect(_df.groupby('cluster')\
-                            .apply(model_cluster))
+def n_clusters_f(_df):
+    """return number of clusters from a dataframe's sample size"""
+    return np.int(np.floor(float(_df.shape[0]) / float(POINTS_PER_CLUSTER)))
 
-def cluster_normalized_effect(_df, n_clusters=False):
+def cluster_error_f(n_clusters, df):
+    """Return sum of squared error for ncluster and df"""
+    sum_error = 0
+    if n_clusters < 0:
+        raise ValueError("CLUSTERS ARE NEGATIVE?!?!?!?!")
+    for _i in range(NSAMPLE):
+        (train, test) = train_test_split(df, random_state=RANDOM_STATE)
+        train = train.copy(deep=True)
+        test = test.copy(deep=True)
+        (train, f) =\
+            assign_clusters(train, CONTROL_KEYS, 'cluster',
+                            normalized_key, n_clusters)
+        test['cluster'] = f(test)
+        linear_fits = train.groupby('cluster').apply(model_cluster)
+        score = test.groupby('cluster').apply(error_cluster, linear_fits).sum()
+        sum_error = sum_error+score
+    return sum_error
+
+
+PHI = 0.5 * (np.sqrt(5.0) -1.0)
+
+def calc_clusters(df):
+    """Esimtate optimum clusters by calcultating fit of model on held out data
+
+Uses golden sections earch. [a, b] are interval bounds, c, d are the search
+intervals within [a, b].
+
+This is a little funky because f is nondeterministic, and its domain are ints,
+but it should still work.
+"""
+    df = df.copy(deep=True)
+    df = normalized_prep(df)
+
+    phi = (np.sqrt(5.0) - 1.) / 2.0
+
+    a = 1
+    b = np.int(np.ceil(float(df.shape[0]) / float(MIN_POINTS_PER_CLUSTER)))
+    delta_x = float(b - a)
+    c = int(np.round(float(b) - phi * delta_x))
+    d = int(np.round(float(a) + phi * delta_x))
+
+    # check for initial bracket
+    fa = cluster_error_f(a, df)
+    fb = cluster_error_f(b, df)
+    fc = cluster_error_f(c, df)
+    fd = cluster_error_f(d, df)
+
+    bracket_min = min(fa, fb)
+
+    if fc > bracket_min and fd > bracket_min:
+        warnings.warn("Optimum clusters are at edges?")
+
+    for i in range(1000):
+        print("working on iter %d: (%d, %d, %d, %d)" % (i, a, c, d, b))
+        if fc < fd: # pick left inerval to update
+            b = d
+            d = c
+            fd = fc
+            c = int(np.round(float(b) - phi * float(b - a)))
+            if c == d:
+                cluster = c
+                break
+            fc = cluster_error_f(c, df)
+        else: # pick right interval to update
+            # Pick the right bracket
+            a = c
+            c = d
+            fc = fd
+            d = int(np.round(float(a) + phi * float(b - a)))
+            if c == d:
+                cluster = c
+                break
+            fd = cluster_error_f(d, df)
+    if i > 100:
+        warnings.warn('More than 100 iterations when trying to find optimum cluster (n= %d)' % i)
+    return cluster
+
+def cluster_effect(df, n_clusters):
     """Perform alternate 4 steps in my causal estimatation method:
 1. Normalize each confounder we're adjusting for. (this is more
    accepted method, but makes less snes to me for "nearness"
@@ -161,11 +227,12 @@ def cluster_normalized_effect(_df, n_clusters=False):
 4. Calculate the average slope, weighted by the number of points in each cluster.
 
     """
-    _df = _df.copy(deep=True)
-    _df = assign_clusters(normalized_prep(_df), CONTROL_KEYS,
-                          'cluster_normalized', normalized_key,
-                          n_clusters)
-    return calculate_effect(_df.groupby('cluster_normalized')\
+    df = df.copy(deep=True)
+    (df, _f) =\
+        assign_clusters(normalized_prep(df), CONTROL_KEYS,
+                        'cluster', normalized_key,
+                        n_clusters)
+    return calculate_effect(df.groupby('cluster')\
                             .apply(model_cluster))
 
 def naive_regression(_df):
@@ -191,42 +258,37 @@ Basically set the slope equal to zero for all of those areas.
     m.fit(X=prep_x_data(_df.SM), y=_df.ET)
     return (float(m.coef_) * float(_df.shape[0]) / full_size)
 
-def expert_cluster_effect(_df, site):
-    """Calulcate a a causal effect on _df but using expert guidance to
-account for areas we know dET/dSM = 0 (SM < wilt, SM > wilt).
-
-Basically set the slope equal to zero for all of those areas.
-"""
+def expert_df(_df, site):
+    """return an expert guided _df"""
     wwilt = SITE_CONSTANTS.loc[site, 'wwilt']
     wfc = SITE_CONSTANTS.loc[site, 'wfc']
-    full_size = float(_df.shape[0])
+
     _df = _df[(_df.SM > wwilt) & (_df.SM < wfc)]
-    return (cluster_effect(_df) * float(_df.shape[0]) / full_size)
+    return _df
 
-def expert_cluster_normalized_effect(_df, site):
+def expert_cluster_effect(_df, site, n_clusters):
     """Calulcate a a causal effect on _df but using expert guidance to
 account for areas we know dET/dSM = 0 (SM < wilt, SM > wilt).
 
 Basically set the slope equal to zero for all of those areas.
 """
-    wwilt = SITE_CONSTANTS.loc[site, 'wwilt']
-    wfc = SITE_CONSTANTS.loc[site, 'wfc']
-    _df_subset = _df[(_df.SM > wwilt) & (_df.SM < wfc)]
-    return (cluster_normalized_effect(_df_subset, n_clusters_f(_df))
-            * float(_df_subset.shape[0]) / float(_df.shape[0]))
+    full_size = float(_df.shape[0])
+    _df = expert_df(_df, site)
+    return (cluster_effect(_df, n_clusters) * float(_df.shape[0]) / full_size)
 
 def fit_models(site, name):
     """fit models and calculate slopes for SITE and experiment NAME.
 
 Returns a dicntionary with data and slopes."""
     df = load_experiment(site, name)
+    df['ws'] = np.sqrt(df.u**2 + df.v**2)
     df = df.groupby(['year', 'doy']).apply(true_slope)
     shape0 = df.shape[0]
     df = df[(~np.isnan(df.slope)) & (df['sum_squared_error'] <= 100.0)]
     # print("Fraction of obs removed: %f\n" % (float(shape0 - df.shape[0])/shape0))
     samples = [df.sample(n=df.shape[0],
                               replace=True,
-                              random_state=i)
+                              random_state=RANDOM_STATE)
                for i in range(NSAMPLE)]
     d = dict()
     d['naive_slope'] = naive_regression(df)
@@ -236,18 +298,19 @@ Returns a dicntionary with data and slopes."""
         np.array([expert_naive_regression(_df, site) for _df in samples])
     d['true_slope'] = df.slope.mean()
     d['true_slopes'] = np.array([_df.slope.mean() for _df in samples])
-    d['cluster_slope'] = cluster_effect(df)
-    d['cluster_slopes'] = np.array([cluster_effect(_df)
-                                    for _df in samples])
-    d['cluster_normalized_slope'] = cluster_normalized_effect(df)
-    d['cluster_normalized_slopes'] = np.array([cluster_normalized_effect(_df)
+    if name == 'reality-slope':
+        n_clusters = calc_clusters(df)
+        print("N clusters for site %s: %d\n" % (site, n_clusters))
+        # n_clusters=3
+        d['cluster_slope'] = cluster_effect(df, n_clusters)
+        d['cluster_slopes'] = np.array([cluster_effect(_df, n_clusters)
+                                        for _df in samples])
+        n_clusters = calc_clusters(expert_df(df, site))
+        print("N clusters for site %s, expert: %d\n" % (site, n_clusters))
+        d['expert_cluster_slope'] = expert_cluster_effect(df, site, n_clusters)
+        d['expert_cluster_slopes'] = np.array([expert_cluster_effect(_df,
+                                                                     site, n_clusters)
                                                for _df in samples])
-    d['expert_cluster_slope'] = expert_cluster_effect(df, site)
-    d['expert_cluster_slopes'] = np.array([expert_cluster_normalized_effect(_df, site)
-                                           for _df in samples])
-    d['expert_cluster_normalized_slope'] = expert_cluster_effect(df, site)
-    d['expert_cluster_normalized_slopes'] = np.array([expert_cluster_normalized_effect(_df, site)
-                                                      for _df in samples])
     d['df'] = df
     d['samples'] = samples
     return d
@@ -270,11 +333,14 @@ def model_diagnostics(d):
 
 Mutates dictionary to add diagnostic terms.
 """
-    for error_type in ['naive', 'cluster', 'cluster_normalized', 'expert_cluster_normalized']:
-        d['%s_error' % error_type] = d['%s_slope' % error_type] - d['true_slope']
-        d['%s_errors' % error_type] = [x1 - x2 for (x1, x2) in
-                                       zip(d['%s_slopes' % error_type],
-                                           d['true_slopes'])]
+    for error_type in ['naive', 'expert_naive', 'cluster', 'expert_cluster']:
+        try:
+            d['%s_error' % error_type] = d['%s_slope' % error_type] - d['true_slope']
+            d['%s_errors' % error_type] = [x1 - x2 for (x1, x2) in
+                                           zip(d['%s_slopes' % error_type],
+                                               d['true_slopes'])]
+        except KeyError:
+            True
     return d
 
 def add_linear_regression(model, ax, name):
@@ -439,14 +505,14 @@ def slope_adjustment_box_plot(title=''):
         _df['site'] = site
         dfs.append(_df)
 
-        _df = pd.DataFrame(d['cluster_normalized_slopes'],
+        _df = pd.DataFrame(d['cluster_slopes'],
                            columns=['dET/dSM'])
         _df['slope type'] = 'adjusted'
         _df['site'] = site
         dfs.append(_df)
 
         # if site in ['elko', 'las_vegas']:
-        _df = pd.DataFrame(d['expert_cluster_normalized_slopes'],
+        _df = pd.DataFrame(d['expert_cluster_slopes'],
                            columns=['dET/dSM'])
         _df['slope type'] = 'adjusted\nw/ expert'
         _df['site'] = site
@@ -480,14 +546,14 @@ def error_adjustment_plot_absolute(title=''):
         dfs.append(_df)
 
 
-        _df = pd.DataFrame(np.absolute(d['cluster_normalized_errors']),
+        _df = pd.DataFrame(np.absolute(d['cluster_errors']),
                            columns=['dET/dSM error'])
         _df['error type'] = 'adjusted'
         _df['site'] = site
         dfs.append(_df)
 
         # if site in ['elko', 'las_vegas']:
-        _df = pd.DataFrame(np.absolute(d['expert_cluster_normalized_errors']),
+        _df = pd.DataFrame(np.absolute(d['expert_cluster_errors']),
                            columns=['dET/dSM'])
         _df['error type'] = 'adjusted\nw/ expert'
         _df['site'] = site
@@ -552,6 +618,20 @@ for site in stations.keys():
 
     # if site in {'spokane', 'flagstaff', 'elko', 'las_vegas', 'riverton', 'great_falls'}:
     #     scatter_plot(experiments, title=site)
+
+def fraction_wilt(site):
+    """Return the fraction of obs that are below wilting point for SITE"""
+    _df = SITES[site]['reality-slope']['df']
+    return (float(_df[_df.SM <
+                      float(SITE_CONSTANTS.loc[site, 'wwilt'])].shape[0])
+            / float(_df.shape[0]))
+
+def fraction_fc(site):
+    """Return the fraction of obs that are above field capcaity for SITE"""
+    _df = SITES[site]['reality-slope']['df']
+    return (float(_df[_df.SM >
+                      float(SITE_CONSTANTS.loc[site, 'wfc'])].shape[0])
+            / float(_df.shape[0]))
 
 for site in SITE_ORDER:
     print('%s fraction below wilt : %f\n'
@@ -712,20 +792,6 @@ def site_comparison_figures():
         sns.boxplot(x='site', y=key, data=df, order=SITE_ORDER)
         ax.set_title(key)
     return
-
-def fraction_wilt(site):
-    """Return the fraction of obs that are below wilting point for SITE"""
-    _df = SITES[site]['reality-slope']['df']
-    return (float(_df[_df.SM <
-                      float(SITE_CONSTANTS.loc[site, 'wwilt'])].shape[0])
-            / float(_df.shape[0]))
-
-def fraction_fc(site):
-    """Return the fraction of obs that are above field capcaity for SITE"""
-    _df = SITES[site]['reality-slope']['df']
-    return (float(_df[_df.SM >
-                      float(SITE_CONSTANTS.loc[site, 'wfc'])].shape[0])
-            / float(_df.shape[0]))
 
 def confounding_error(site):
     """Return the difference in absolute error between naiv-slope and randomized
