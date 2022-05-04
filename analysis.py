@@ -198,6 +198,18 @@ Basically set the slope equal to zero for all of those areas.
     _df = _df[(_df.SM > wwilt) & (_df.SM < wfc)]
     return (cluster_effect(_df) * float(_df.shape[0]) / full_size)
 
+def expert_cluster_normalized_effect(_df, site):
+    """Calulcate a a causal effect on _df but using expert guidance to
+account for areas we know dET/dSM = 0 (SM < wilt, SM > wilt).
+
+Basically set the slope equal to zero for all of those areas.
+"""
+    wwilt = SITE_CONSTANTS.loc[site, 'wwilt']
+    wfc = SITE_CONSTANTS.loc[site, 'wfc']
+    full_size = float(_df.shape[0])
+    _df = _df[(_df.SM > wwilt) & (_df.SM < wfc)]
+    return (cluster_normalized_effect(_df) * float(_df.shape[0]) / full_size)
+
 def fit_models(site, name):
     """fit models and calculate slopes for SITE and experiment NAME.
 
@@ -225,10 +237,12 @@ Returns a dicntionary with data and slopes."""
     d['cluster_normalized_slope'] = cluster_normalized_effect(df)
     d['cluster_normalized_slopes'] = np.array([cluster_normalized_effect(_df)
                                                for _df in samples])
-
     d['expert_cluster_slope'] = expert_cluster_effect(df, site)
-    d['expert_cluster_slopes'] = np.array([expert_cluster_effect(_df, site)
+    d['expert_cluster_slopes'] = np.array([expert_cluster_normalized_effect(_df, site)
                                            for _df in samples])
+    d['expert_cluster_normalized_slope'] = expert_cluster_effect(df, site)
+    d['expert_cluster_normalized_slopes'] = np.array([expert_cluster_normalized_effect(_df, site)
+                                                      for _df in samples])
     d['df'] = df
     d['samples'] = samples
     return d
@@ -251,7 +265,7 @@ def model_diagnostics(d):
 
 Mutates dictionary to add diagnostic terms.
 """
-    for error_type in ['naive', 'cluster', 'cluster_normalized']:
+    for error_type in ['naive', 'cluster', 'cluster_normalized', 'expert_cluster_normalized']:
         d['%s_error' % error_type] = d['%s_slope' % error_type] - d['true_slope']
         d['%s_errors' % error_type] = [x1 - x2 for (x1, x2) in
                                        zip(d['%s_slopes' % error_type],
@@ -431,6 +445,12 @@ def slope_adjustment_box_plot(title=''):
         _df['slope type'] = '(c) normalized'
         _df['site'] = site
         dfs.append(_df)
+        if site in ['elko', 'las_vegas']:
+            _df = pd.DataFrame(d['expert_cluster_normalized_slopes'],
+                               columns=['dET/dSM'])
+            _df['slope type'] = 'normalized w/ expert'
+            _df['site'] = site
+            dfs.append(_df)
 
         _df = pd.DataFrame(d['true_slopes'],
                            columns=['dET/dSM'])
@@ -441,7 +461,7 @@ def slope_adjustment_box_plot(title=''):
     ax1 = sns.boxplot(x='site', y='dET/dSM', hue='slope type', data=df,
                       order=SITE_ORDER, ax=ax1,
                       hue_order=['naive', 'clustered adjustment',
-                                 '(c) normalized', 'truth'])
+                                 '(c) normalized',  'normalized w/ expert', 'truth'])
     ax1.set_ylabel('dET/dSM (slope)')
     ax1.set_xlabel('Site')
     plt.legend()
@@ -453,19 +473,28 @@ def error_adjustment_plot_absolute(title=''):
     fig, ax = plt.subplots()
     dfs = c.deque()
     for (site, experiments) in SITES.items():
-        _df = pd.DataFrame(np.absolute(experiments['reality-slope']['naive_errors']),
+        d = experiments['reality-slope']
+        _df = pd.DataFrame(np.absolute(d['naive_errors']),
                            columns=['dET/dSM error'])
         _df['error type'] = 'naive'
         _df['site'] = site
         dfs.append(_df)
 
-        _df = pd.DataFrame(np.absolute(experiments['reality-slope']['cluster_errors']),
+        _df = pd.DataFrame(np.absolute(d['cluster_errors']),
                            columns=['dET/dSM error'])
         _df['error type'] = 'clustered adjustment'
         _df['site'] = site
         dfs.append(_df)
 
-        _df = pd.DataFrame(np.absolute(experiments['reality-slope']['cluster_normalized_errors']),
+        if site in ['elko', 'las_vegas']:
+            _df = pd.DataFrame(d['expert_cluster_normalized_errors'],
+                               columns=['dET/dSM'])
+            _df['error type'] = 'normalized w/ expert'
+            _df['site'] = site
+            dfs.append(_df)
+
+
+        _df = pd.DataFrame(np.absolute(d['cluster_normalized_errors']),
                            columns=['dET/dSM error'])
         _df['error type'] = '(c) normalized'
         _df['site'] = site
@@ -473,7 +502,9 @@ def error_adjustment_plot_absolute(title=''):
     df = pd.concat(dfs, ignore_index=True)
     ax = sns.boxplot(x='site', y='dET/dSM error', hue='error type', data=df,
                      order=SITE_ORDER,
-                     hue_order=['naive', 'clustered adjustment', '(c) normalized'])
+                     hue_order=['naive', 'clustered adjustment',
+                                '(c) normalized', 'normalized w/ expert']
+                     )
     ax.set_ylabel('dET/dSM absolute error')
     ax.set_xlabel('Site')
     plt.legend()
@@ -755,8 +786,7 @@ df = concat_experiment('reality-slope')
 f = open('/home/adam/dissertation/tables/table3-1.tex', 'w')
 summary_table(f)
 f.close()
-# site_comparison_figures()
-final_site_comparison_figures()
+# final_site_comparison_figures()
 
 # make this a scatter with site legend?
 #
