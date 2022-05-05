@@ -14,7 +14,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from sklearn.cluster import KMeans
 
-CLEAN_SITES = False
+CLEAN_SITES = True
 data_dir = "./data"
 
 SITE_CONSTANTS = pd.read_csv('%s/site-constants.csv' % data_dir)
@@ -35,6 +35,56 @@ CONSTANT_KEYS = \
     'z0m']
 
 RANDOM_STATE = np.random.RandomState(0)
+# below site order is clusterd by similar climates
+SITE_ORDER = ['bergen', 'idar_oberstein', 'lindenberg', 'milano', 'kelowna',  'quad_city',
+              'spokane', 'flagstaff', 'elko', 'las_vegas', 'riverton', 'great_falls' ]
+
+NCLUSTERS = dict(zip(SITE_ORDER, [False for _s in SITE_ORDER]))
+NCLUSTERS =\
+    {'quad_city' : 14,
+     'las_vegas' : 22,
+     'flagstaff' : 26,
+     'kelowna' : 20,
+     'great_falls' : 20,
+     'bergen' : 20,
+     'spokane' : 10,
+     'riverton' : 10,
+     'elko' : 16,
+     'lindenberg' : 36,
+     'idar_oberstein' : 32,
+     'milano' : 17
+     }
+NCLUSTERS_EXPERT = dict(zip(SITE_ORDER, [False for _s in SITE_ORDER]))
+NCLUSTERS_EXPERT =\
+     {'quad_city' : 14,
+      'las_vegas' : 22,
+      'flagstaff' : 22,
+      'kelowna' : 16,
+      'great_falls' : 20,
+      'bergen' : 20,
+      'spokane' : 12,
+      'riverton' : 18,
+      'elko' : 8,
+      'lindenberg' : 44, # 44
+      'idar_oberstein' : 32,
+      'milano' : 20
+      }
+
+NCLUSTER_TEST =\
+    {'milano' : list(range(1,21)), # seem like about (20, 5)
+     'idar_oberstein' : list(range(2, 48, 2)), # seemed like (10-20, 35)
+     'lindenberg' : list(range(2, 48, 2)), # seemed like (10-20, 35)
+     'elko' : list(range(1, 21)),
+     'riverton' : list(range(2, 48, 2)), # really confusing
+     'spokane' : list(range(1,21)), # was way off above 40, so keep it below there
+     'bergen' : list(range(2, 38, 2)), # similar to spokane
+     'great_falls' : list(range(2,42, 2)),
+     'kelowna' : list(range(1,21)),
+     'flagstaff' : list(range(2,42,2)),
+     'las_vegas' : list(range(2, 32, 2)),
+     'quad_city' : list(range(2,36,2))
+     }
+
 
 def load_experiment(site, name):
     """Load experiment cooresponding to SITE and NAME."""
@@ -144,9 +194,9 @@ def n_clusters_f(_df):
 def cluster_error_f(n_clusters, df):
     """Return sum of squared error for ncluster and df"""
     sum_error = 0
-    if n_clusters < 0:
-        raise ValueError("CLUSTERS ARE NEGATIVE?!?!?!?!")
-    for _i in range(NSAMPLE):
+    df = df.copy(deep=True)
+    df = normalized_prep(df)
+    for _i in range(5):
         (train, test) = train_test_split(df, random_state=RANDOM_STATE)
         train = train.copy(deep=True)
         test = test.copy(deep=True)
@@ -158,65 +208,6 @@ def cluster_error_f(n_clusters, df):
         score = test.groupby('cluster').apply(error_cluster, linear_fits).sum()
         sum_error = sum_error+score
     return sum_error
-
-
-PHI = 0.5 * (np.sqrt(5.0) -1.0)
-
-def calc_clusters(df):
-    """Esimtate optimum clusters by calcultating fit of model on held out data
-
-Uses golden sections earch. [a, b] are interval bounds, c, d are the search
-intervals within [a, b].
-
-This is a little funky because f is nondeterministic, and its domain are ints,
-but it should still work.
-"""
-    df = df.copy(deep=True)
-    df = normalized_prep(df)
-
-    phi = (np.sqrt(5.0) - 1.) / 2.0
-
-    a = 1
-    b = np.int(np.ceil(float(df.shape[0]) / float(MIN_POINTS_PER_CLUSTER)))
-    delta_x = float(b - a)
-    c = int(np.round(float(b) - phi * delta_x))
-    d = int(np.round(float(a) + phi * delta_x))
-
-    # check for initial bracket
-    fa = cluster_error_f(a, df)
-    fb = cluster_error_f(b, df)
-    fc = cluster_error_f(c, df)
-    fd = cluster_error_f(d, df)
-
-    bracket_min = min(fa, fb)
-
-    if fc > bracket_min and fd > bracket_min:
-        warnings.warn("Optimum clusters are at edges?")
-
-    for i in range(1000):
-        print("working on iter %d: (%d, %d, %d, %d)" % (i, a, c, d, b))
-        if fc < fd: # pick left inerval to update
-            b = d
-            d = c
-            fd = fc
-            c = int(np.round(float(b) - phi * float(b - a)))
-            if c == d:
-                cluster = c
-                break
-            fc = cluster_error_f(c, df)
-        else: # pick right interval to update
-            # Pick the right bracket
-            a = c
-            c = d
-            fc = fd
-            d = int(np.round(float(a) + phi * float(b - a)))
-            if c == d:
-                cluster = c
-                break
-            fd = cluster_error_f(d, df)
-    if i > 100:
-        warnings.warn('More than 100 iterations when trying to find optimum cluster (n= %d)' % i)
-    return cluster
 
 def cluster_effect(df, n_clusters):
     """Perform alternate 4 steps in my causal estimatation method:
@@ -299,18 +290,31 @@ Returns a dicntionary with data and slopes."""
     d['true_slope'] = df.slope.mean()
     d['true_slopes'] = np.array([_df.slope.mean() for _df in samples])
     if name == 'reality-slope':
-        n_clusters = calc_clusters(df)
-        print("N clusters for site %s: %d\n" % (site, n_clusters))
-        # n_clusters=3
-        d['cluster_slope'] = cluster_effect(df, n_clusters)
-        d['cluster_slopes'] = np.array([cluster_effect(_df, n_clusters)
-                                        for _df in samples])
-        n_clusters = calc_clusters(expert_df(df, site))
-        print("N clusters for site %s, expert: %d\n" % (site, n_clusters))
-        d['expert_cluster_slope'] = expert_cluster_effect(df, site, n_clusters)
-        d['expert_cluster_slopes'] = np.array([expert_cluster_effect(_df,
-                                                                     site, n_clusters)
-                                               for _df in samples])
+        n_clusters = NCLUSTERS[site]
+        if n_clusters:
+            print("N clusters for site %s: %d\n" % (site, n_clusters))
+            # n_clusters=3
+            d['cluster_slope'] = cluster_effect(df, n_clusters)
+            d['cluster_slopes'] = np.array([cluster_effect(_df, n_clusters)
+                                            for _df in samples])
+        else:
+            plt.figure()
+            n_clusters_test = NCLUSTER_TEST[site]
+            plt.plot(n_clusters_test, [cluster_error_f(n, df) for n in n_clusters_test],'k*')
+            plt.title('%s, regular' % site)
+        n_clusters = NCLUSTERS_EXPERT[site]
+        if n_clusters:
+            print("N clusters for site %s, expert: %d\n" % (site, n_clusters))
+            d['expert_cluster_slope'] = expert_cluster_effect(df, site, n_clusters)
+            d['expert_cluster_slopes'] = np.array([expert_cluster_effect(_df,
+                                                                         site, n_clusters)
+                                                   for _df in samples])
+        else:
+            _df = expert_df(df, site)
+            n_clusters_test = NCLUSTER_TEST[site]
+            plt.figure()
+            plt.plot(n_clusters_test, [cluster_error_f(n, _df) for n in n_clusters_test],'k*')
+            plt.title('%s, expert' % site)
     d['df'] = df
     d['samples'] = samples
     return d
@@ -366,9 +370,6 @@ with regression fits overlaid"""
     plt.title(title)
     return
 
-# below site order is low to increasing d/et dsm, but we could also cluster by similar cliamtes, etc.
-SITE_ORDER = ['bergen', 'idar_oberstein', 'lindenberg', 'milano', 'kelowna',  'quad_city',
-              'spokane', 'flagstaff', 'elko', 'las_vegas', 'riverton', 'great_falls' ]
 
 CONCATS = dict()
 def concat_experiment(key):
