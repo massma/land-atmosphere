@@ -13,6 +13,7 @@ sns.set_theme()
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from sklearn.cluster import KMeans
+from sklearn.neighbors import NearestNeighbors
 
 CLEAN_SITES = True
 data_dir = "./data"
@@ -39,51 +40,24 @@ RANDOM_STATE = np.random.RandomState(0)
 SITE_ORDER = ['bergen', 'idar_oberstein', 'lindenberg', 'milano', 'kelowna',  'quad_city',
               'spokane', 'flagstaff', 'elko', 'las_vegas', 'riverton', 'great_falls' ]
 
-NCLUSTERS = dict(zip(SITE_ORDER, [False for _s in SITE_ORDER]))
-NCLUSTERS =\
-    {'quad_city' : 14,
-     'las_vegas' : 22,
-     'flagstaff' : 26,
-     'kelowna' : 20,
-     'great_falls' : 20,
-     'bergen' : 20,
-     'spokane' : 10,
-     'riverton' : 10,
-     'elko' : 16,
-     'lindenberg' : 36,
-     'idar_oberstein' : 32,
-     'milano' : 17
-     }
-NCLUSTERS_EXPERT = dict(zip(SITE_ORDER, [False for _s in SITE_ORDER]))
-NCLUSTERS_EXPERT =\
-     {'quad_city' : 14,
-      'las_vegas' : 22,
-      'flagstaff' : 22,
-      'kelowna' : 16,
-      'great_falls' : 20,
-      'bergen' : 20,
-      'spokane' : 12,
-      'riverton' : 18,
-      'elko' : 8,
-      'lindenberg' : 44, # 44
-      'idar_oberstein' : 32,
-      'milano' : 20
-      }
+NNEIGHBORS = dict(zip(SITE_ORDER, [False for _s in SITE_ORDER]))
 
-NCLUSTER_TEST =\
-    {'milano' : list(range(1,21)), # seem like about (20, 5)
-     'idar_oberstein' : list(range(2, 48, 2)), # seemed like (10-20, 35)
-     'lindenberg' : list(range(2, 48, 2)), # seemed like (10-20, 35)
-     'elko' : list(range(1, 21)),
-     'riverton' : list(range(2, 48, 2)), # really confusing
-     'spokane' : list(range(1,21)), # was way off above 40, so keep it below there
-     'bergen' : list(range(2, 38, 2)), # similar to spokane
-     'great_falls' : list(range(2,42, 2)),
-     'kelowna' : list(range(1,21)),
-     'flagstaff' : list(range(2,42,2)),
-     'las_vegas' : list(range(2, 32, 2)),
-     'quad_city' : list(range(2,36,2))
+NNEIGHBORS =\
+    { 'quad_city' : 10,
+      'las_vegas' : 20,
+      'flagstaff' : 20,
+      'kelowna' : 10,
+      'great_falls' : 10,
+      'bergen' : 10,
+      'spokane' : 10,
+      'riverton' : 20,
+      'elko' : 30,
+      'lindenberg' : 10,
+      'idar_oberstein' : 10,
+      'milano' : 20,
      }
+
+NNEIGHBOR_TEST = np.concatenate(([5], np.arange(10, 110, 10)))
 
 
 def load_experiment(site, name):
@@ -127,11 +101,11 @@ def true_slope(_df):
 NSAMPLE = 50 # for bootstrap
 
 ATM_KEYS = {'theta', 'advtheta', 'q', 'advq', 'cc', 'ws', 'h', 'day'}
-LAND_KEYS = {'T2', 'Tsoil', 'Ts', 'LAI'} # should we include SM here?
-                                         # it taints the idea of
-                                         # matching, but makes sense
-                                         # with the idea of piecewise
-                                         # linear
+LAND_KEYS = {'T2', 'Tsoil', 'Ts', 'LAI', 'SM'} # should we include SM here?
+                                               # it taints the idea of
+                                               # matching, but makes sense
+                                               # with the idea of piecewise
+                                               # linear
 CONTROL_KEYS = ATM_KEYS.union(LAND_KEYS)
 
 def normalized_key(key):
@@ -146,85 +120,85 @@ normalize each variable"""
         _df[normalized_key(key)] = (_df[key] - _df[key].mean())/_df[key].std()
     return _df
 
-# average number of points we want per a cluster
-MIN_POINTS_PER_CLUSTER = 6
-# MAX_CLUSTERS = 20
-def assign_clusters(_df, keys, classification_key, key_mapper, n_clusters=False):
-    """Classify each point in _DF based on values cooresponding to
-    KEY, and assign classification to CLASSIFICATION_KEY.
+def fit_neighbors(_df, keys, classification_key, key_mapper, n_neighbors):
+    """Build neighbors based on values assigned to KEY, and assign
+classification to CLASSIFICATION_KEY.
 
-    KEY_MAPPER is a function that maps a key to the metric by which we are clustering.
+    KEY_MAPPER is a function that maps a key to the metric by which we are neighboring.
+
     """
-    if not n_clusters:
-        n_clusters = n_clusters_f(_df)
-    max_iter=1000
-    model = KMeans(n_clusters=n_clusters, max_iter=max_iter, algorithm="full",
-                   random_state=RANDOM_STATE)
+    neigh = NearestNeighbors(n_neighbors=n_neighbors)
     xs = _df[list(map(key_mapper, keys))].values
-    model.fit(xs)
-    if model.n_iter_ == max_iter:
-        raise Exception('ERORR: max iterations reached when iftting model on %s' % classification_key)
-    _df[classification_key] = model.predict(xs)
-    return (_df, (lambda df: model.predict(df[list(map(key_mapper, keys))].values)))
+    neigh = neigh.fit(xs)
+    _df[classification_key] = list(neigh.kneighbors(xs, return_distance=False))
+    return _df
 
-def model_cluster(_df):
-    """intended to be called on groupby, fit linear model on _DF and return slope and count"""
+def model_neighbors(neighbors, _df):
+    """intended to be called on neibors, fit linear model on _DF and return slope and count"""
+    df = _df.iloc[neighbors, :]
     m = LinearRegression()
-    m.fit(X=prep_x_data(_df.SM), y=_df.ET)
-    count = np.float(_df.shape[0])
-    # print('count: %f' % count)
-    return pd.Series({'slope' : np.float(m.coef_),
-                      'count' : count,
-                      'model' : m})
+    m.fit(X=prep_x_data(df.SM), y=df.ET)
+    return m
 
-def error_cluster(_df, model):
-    """intended to be called on groupby cluster, return error associated with cluster """
-    cluster =  _df.iloc[0]['cluster']
-    m = model.loc[cluster]['model']
-    return np.sum((np.squeeze(m.predict(X=prep_x_data(_df.SM))) - _df.ET)**2)
+def error_neighbors(model, neighbors, _df):
+    """Score model using neighbors in _df.
 
-def calculate_effect(grouped):
-    """Calulcate causal effect from GROUPED: a dataframe of slopes and counts"""
-    return (grouped['slope'] * grouped['count']).sum()/grouped['count'].sum()
+Metric is average squared error (so it doesn't grow eith neighbor size.
 
-def n_clusters_f(_df):
-    """return number of clusters from a dataframe's sample size"""
-    return np.int(np.floor(float(_df.shape[0]) / float(POINTS_PER_CLUSTER)))
+Also neighbors should be held out data."""
+    df = _df.iloc[neighbors, :]
+    predicts = np.squeeze(model.predict(X=prep_x_data(df.SM)))
+    return np.average((predicts - df.ET)**2)
 
-def cluster_error_f(n_clusters, df):
-    """Return sum of squared error for ncluster and df"""
-    sum_error = 0
+def neighbor_error_f(n_neighbors, df):
+    """Return average of squared error for nneighbor and df"""
+    if ((n_neighbors * 0.8) % 1) != 0.0:
+        raise ValueError('n_neighbors not divisible by 5 for testing!')
     df = df.copy(deep=True)
-    df = normalized_prep(df)
-    for _i in range(5):
-        (train, test) = train_test_split(df, random_state=RANDOM_STATE)
-        train = train.copy(deep=True)
-        test = test.copy(deep=True)
-        (train, f) =\
-            assign_clusters(train, CONTROL_KEYS, 'cluster',
-                            normalized_key, n_clusters)
-        test['cluster'] = f(test)
-        linear_fits = train.groupby('cluster').apply(model_cluster)
-        score = test.groupby('cluster').apply(error_cluster, linear_fits).sum()
-        sum_error = sum_error+score
-    return sum_error
+    df = fit_neighbors(normalized_prep(df), CONTROL_KEYS,
+                       'neighbors', normalized_key,
+                       n_neighbors)
+    n_samples = 5
+    averages = c.deque()
+    for neighbors in df['neighbors'].values:
+        sum_averages = 0
+        for _i in range(n_samples):
+            (train, test) = train_test_split(neighbors,
+                                             random_state=RANDOM_STATE,
+                                             train_size=0.8)
+            m = model_neighbors(train, df)
+            sum_averages = sum_averages + error_neighbors(m, test, df)
+        averages.append((sum_averages/float(n_samples)))
+    return np.average(averages)
 
-def cluster_effect(df, n_clusters):
-    """Perform alternate 4 steps in my causal estimatation method:
+def neighbor_effect(df, n_neighbors):
+    """Perform 4 steps in my causal estimatation method:
 1. Normalize each confounder we're adjusting for. (this is more
    accepted method, but makes less snes to me for "nearness"
-2. Assign each point a cluster based on rankings ("match").
-3. Group by each cluster and calcualte a slope.
-4. Calculate the average slope, weighted by the number of points in each cluster.
-
+2. Calculate a k nearest neighbors classifier
+3. Calcualte a local slope based on each k nearest neighbors.
     """
     df = df.copy(deep=True)
-    (df, _f) =\
-        assign_clusters(normalized_prep(df), CONTROL_KEYS,
-                        'cluster', normalized_key,
-                        n_clusters)
-    return calculate_effect(df.groupby('cluster')\
-                            .apply(model_cluster))
+    (df) =\
+        fit_neighbors(normalized_prep(df), CONTROL_KEYS,
+                      'neighbors', normalized_key,
+                      n_neighbors)
+    df['neighbor_effect_model'] = [model_neighbors(neighbors, df) for neighbors in
+                                   df['neighbors']]
+    df['neighbor_slope'] = [float(m.coef_) for m in df['neighbor_effect_model']]
+
+
+    wwilt = SITE_CONSTANTS.loc[site, 'wwilt']
+    wfc = SITE_CONSTANTS.loc[site, 'wfc']
+    df_expert = df.loc[(df.SM > wwilt) & (df.SM < wfc), :].copy(deep=True)
+    df_expert = fit_neighbors(normalized_prep(df_expert), CONTROL_KEYS, 'neighbors',
+                              normalized_key, n_neighbors)
+    models = [model_neighbors(neighbors, df) for neighbors in
+              df_expert['neighbors']]
+    slopes = [float(m.coef_) for m in models]
+    df['expert_neighbor_slope'] = 0.0
+    df.loc[(df.SM > wwilt) & (df.SM < wfc), 'expert_neighbor_slope'] = slopes
+    return df
 
 def naive_regression(_df):
     """Calulcate a naive regression on _df. Return the slope.
@@ -257,16 +231,6 @@ def expert_df(_df, site):
     _df = _df[(_df.SM > wwilt) & (_df.SM < wfc)]
     return _df
 
-def expert_cluster_effect(_df, site, n_clusters):
-    """Calulcate a a causal effect on _df but using expert guidance to
-account for areas we know dET/dSM = 0 (SM < wilt, SM > wilt).
-
-Basically set the slope equal to zero for all of those areas.
-"""
-    full_size = float(_df.shape[0])
-    _df = expert_df(_df, site)
-    return (cluster_effect(_df, n_clusters) * float(_df.shape[0]) / full_size)
-
 def fit_models(site, name):
     """fit models and calculate slopes for SITE and experiment NAME.
 
@@ -289,32 +253,19 @@ Returns a dicntionary with data and slopes."""
         np.array([expert_naive_regression(_df, site) for _df in samples])
     d['true_slope'] = df.slope.mean()
     d['true_slopes'] = np.array([_df.slope.mean() for _df in samples])
-    if name == 'reality-slope':
-        n_clusters = NCLUSTERS[site]
-        if n_clusters:
-            print("N clusters for site %s: %d\n" % (site, n_clusters))
-            # n_clusters=3
-            d['cluster_slope'] = cluster_effect(df, n_clusters)
-            d['cluster_slopes'] = np.array([cluster_effect(_df, n_clusters)
-                                            for _df in samples])
-        else:
-            plt.figure()
-            n_clusters_test = NCLUSTER_TEST[site]
-            plt.plot(n_clusters_test, [cluster_error_f(n, df) for n in n_clusters_test],'k*')
-            plt.title('%s, regular' % site)
-        n_clusters = NCLUSTERS_EXPERT[site]
-        if n_clusters:
-            print("N clusters for site %s, expert: %d\n" % (site, n_clusters))
-            d['expert_cluster_slope'] = expert_cluster_effect(df, site, n_clusters)
-            d['expert_cluster_slopes'] = np.array([expert_cluster_effect(_df,
-                                                                         site, n_clusters)
-                                                   for _df in samples])
-        else:
-            _df = expert_df(df, site)
-            n_clusters_test = NCLUSTER_TEST[site]
-            plt.figure()
-            plt.plot(n_clusters_test, [cluster_error_f(n, _df) for n in n_clusters_test],'k*')
-            plt.title('%s, expert' % site)
+    n_neighbors = NNEIGHBORS[site]
+    if n_neighbors:
+        print("N neighbors for site %s: %d\n" % (site, n_neighbors))
+        df = neighbor_effect(df, n_neighbors)
+        samples = [neighbor_effect(_df, n_neighbors)
+                   for _df in samples]
+    else:
+        plt.figure()
+        n_neighbors_test = NNEIGHBOR_TEST
+        plt.plot(n_neighbors_test, [neighbor_error_f(n, df) for n in n_neighbors_test],'k*')
+        plt.ylabel('Average squared error per point')
+        plt.xlabel('N neighbors')
+        plt.title('%s, regular' % site)
     d['df'] = df
     d['samples'] = samples
     return d
@@ -337,14 +288,22 @@ def model_diagnostics(d):
 
 Mutates dictionary to add diagnostic terms.
 """
-    for error_type in ['naive', 'expert_naive', 'cluster', 'expert_cluster']:
+    for slope_type in ['neighbor', 'expert_neighbor']:
+        df = d['df']
+        samples = d['samples']
+        d['%s_slope' % slope_type] = df['%s_slope' % slope_type].mean()
+        d['%s_slopes' % slope_type] = \
+            np.array([_df['%s_slope' % slope_type].mean()
+                      for _df in samples])
+
+    for error_type in ['naive', 'expert_naive', 'neighbor', 'expert_neighbor']:
         try:
             d['%s_error' % error_type] = d['%s_slope' % error_type] - d['true_slope']
             d['%s_errors' % error_type] = [x1 - x2 for (x1, x2) in
                                            zip(d['%s_slopes' % error_type],
                                                d['true_slopes'])]
         except KeyError:
-            True
+            warnings.warn("key error in model diagnostics: %s" % error_type)
     return d
 
 def add_linear_regression(model, ax, name):
@@ -506,14 +465,14 @@ def slope_adjustment_box_plot(title=''):
         _df['site'] = site
         dfs.append(_df)
 
-        _df = pd.DataFrame(d['cluster_slopes'],
+        _df = pd.DataFrame(d['neighbor_slopes'],
                            columns=['dET/dSM'])
         _df['slope type'] = 'adjusted'
         _df['site'] = site
         dfs.append(_df)
 
         # if site in ['elko', 'las_vegas']:
-        _df = pd.DataFrame(d['expert_cluster_slopes'],
+        _df = pd.DataFrame(d['expert_neighbor_slopes'],
                            columns=['dET/dSM'])
         _df['slope type'] = 'adjusted\nw/ expert'
         _df['site'] = site
@@ -547,14 +506,14 @@ def error_adjustment_plot_absolute(title=''):
         dfs.append(_df)
 
 
-        _df = pd.DataFrame(np.absolute(d['cluster_errors']),
+        _df = pd.DataFrame(np.absolute(d['neighbor_errors']),
                            columns=['dET/dSM error'])
         _df['error type'] = 'adjusted'
         _df['site'] = site
         dfs.append(_df)
 
         # if site in ['elko', 'las_vegas']:
-        _df = pd.DataFrame(np.absolute(d['expert_cluster_errors']),
+        _df = pd.DataFrame(np.absolute(d['expert_neighbor_errors']),
                            columns=['dET/dSM'])
         _df['error type'] = 'adjusted\nw/ expert'
         _df['site'] = site
