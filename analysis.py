@@ -15,7 +15,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.cluster import KMeans
 from sklearn.neighbors import NearestNeighbors
 
-CLEAN_SITES = True
+CLEAN_SITES = False
 data_dir = "./data"
 
 SITE_CONSTANTS = pd.read_csv('%s/site-constants.csv' % data_dir)
@@ -40,9 +40,7 @@ RANDOM_STATE = np.random.RandomState(0)
 SITE_ORDER = ['bergen', 'idar_oberstein', 'lindenberg', 'milano', 'kelowna',  'quad_city',
               'spokane', 'flagstaff', 'elko', 'las_vegas', 'riverton', 'great_falls' ]
 
-NNEIGHBORS = dict(zip(SITE_ORDER, [False for _s in SITE_ORDER]))
-NNEIGHBORS_EXPERT = dict(zip(SITE_ORDER, [False for _s in SITE_ORDER]))
-NNEIGHBORS_expert =\
+NNEIGHBORS_EXPERT =\
     {
       'quad_city' : 10,
       'las_vegas' : 10,
@@ -209,7 +207,7 @@ def neighbor_effect(df, n_neighbors, n_neighbors_expert):
     df_expert = df.loc[(df.SM > wwilt) & (df.SM < wfc), :].copy(deep=True)
     df_expert = fit_neighbors(normalized_prep(df_expert), CONTROL_KEYS, 'neighbors',
                               normalized_key, n_neighbors_expert)
-    models = [model_neighbors(neighbors, df) for neighbors in
+    models = [model_neighbors(neighbors, df_expert) for neighbors in
               df_expert['neighbors']]
     slopes = [float(m.coef_) for m in models]
     df['expert_neighbor_slope'] = 0.0
@@ -270,28 +268,11 @@ Returns a dicntionary with data and slopes."""
     d['true_slopes'] = np.array([_df.slope.mean() for _df in samples])
     n_neighbors = NNEIGHBORS[site]
     n_neighbors_expert = NNEIGHBORS_EXPERT[site]
-    if not n_neighbors:
-        plt.figure()
-        n_neighbors_test = NNEIGHBOR_TEST
-        plt.plot(n_neighbors_test, [neighbor_error_f(n, df) for n in n_neighbors_test],'k*')
-        plt.ylabel('Average squared error per point')
-        plt.xlabel('N neighbors')
-        plt.title('%s, regular' % site)
-    if not n_neighbors_expert:
-        plt.figure()
-        n_neighbors_test = NNEIGHBOR_TEST
-        df_expert = expert_df(df, site).copy(deep=True)
-        plt.plot(n_neighbors_test, [neighbor_error_f(n, df_expert)
-                                    for n in n_neighbors_test],'k*')
-        plt.ylabel('Average squared error per point')
-        plt.xlabel('N neighbors')
-        plt.title('%s, expert' % site)
-    if (n_neighbors and n_neighbors_expert):
-        print("N neighbors for site %s: %d\n" % (site, n_neighbors))
-        print("N neighbors for site %s, expert: %d\n" % (site, n_neighbors_expert))
-        df = neighbor_effect(df, n_neighbors, n_neighbors_expert)
-        samples = [neighbor_effect(_df, n_neighbors, n_neighbors_expert)
-                   for _df in samples]
+    print("N neighbors for site %s: %d\n" % (site, n_neighbors))
+    print("N neighbors for site %s, expert: %d\n" % (site, n_neighbors_expert))
+    df = neighbor_effect(df, n_neighbors, n_neighbors_expert)
+    samples = [neighbor_effect(_df, n_neighbors, n_neighbors_expert)
+               for _df in samples]
     d['df'] = df
     d['samples'] = samples
     return d
@@ -538,9 +519,8 @@ def error_adjustment_plot_absolute(title=''):
         _df['site'] = site
         dfs.append(_df)
 
-        # if site in ['elko', 'las_vegas']:
         _df = pd.DataFrame(np.absolute(d['expert_neighbor_errors']),
-                           columns=['dET/dSM'])
+                           columns=['dET/dSM error'])
         _df['error type'] = 'adjusted\nw/ expert'
         _df['site'] = site
         dfs.append(_df)
@@ -548,7 +528,7 @@ def error_adjustment_plot_absolute(title=''):
     df = pd.concat(dfs, ignore_index=True)
     ax = sns.boxplot(x='site', y='dET/dSM error', hue='error type', data=df,
                      order=SITE_ORDER,
-                     # hue_order=['naive', 'adjusted', 'adjusted\nw/ expert']
+                     hue_order=['naive', 'adjusted', 'adjusted\nw/ expert']
                      )
     ax.set_ylabel('dET/dSM absolute error')
     ax.set_xlabel('Site')
