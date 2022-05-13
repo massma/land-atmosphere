@@ -1,8 +1,7 @@
 digraph G {
 
-        climate[label="climate\n/season"];
-        synoptic[label="synoptic\n/weather"];
-        ecosystemHistory[label="ecosystem\nhistory"];
+        climate[label="climate\n& interannual\nvariability"];
+        season[label="season"];
         LAI[label="LAI (t=0)"];
         sm[label="SM(t=0)"];
 	et[label="average(ET(t>0))"];
@@ -15,26 +14,25 @@ digraph G {
 
         doy[label="day of\nyear"];
 
-        doy -> climate;
-        climate -> ecosystemHistory;
-        climate -> synoptic;
-        synoptic -> temperature;
-        synoptic -> humidity;
-        synoptic -> cloud;
-        synoptic -> wind;
-        synoptic -> blheight;
+        doy -> season;
+        climate -> season;
+        climate -> temperature;
+        climate -> humidity;
+        climate -> cloud;
+        climate -> wind;
+        climate -> blheight;
 
-        synoptic -> groundTemperature;
+        climate -> groundTemperature;
 
-        ecosystemHistory -> temperature;
-        ecosystemHistory -> humidity;
-        ecosystemHistory -> cloud;
-        ecosystemHistory -> wind;
-        ecosystemHistory -> blheight;
-        ecosystemHistory -> groundTemperature;
+        season -> temperature;
+        season -> humidity;
+        season -> cloud;
+        season -> wind;
+        season -> blheight;
+        season -> groundTemperature;
 
-        ecosystemHistory -> LAI;
-        ecosystemHistory -> sm;
+        season -> LAI;
+        season -> sm;
 
         doy -> et;
         temperature -> et;
