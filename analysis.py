@@ -15,7 +15,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.cluster import KMeans
 from sklearn.neighbors import NearestNeighbors
 
-CLEAN_SITES = False
+CLEAN_SITES = True
 data_dir = "./data"
 
 SITE_CONSTANTS = pd.read_csv('%s/site-constants.csv' % data_dir)
@@ -71,8 +71,24 @@ NNEIGHBORS =\
       'milano' : 20,
      }
 
-NNEIGHBOR_TEST = np.concatenate(([5], np.arange(10, 110, 10)))
+NNEIGHBORS_DOY = dict(zip(SITE_ORDER, [False for _s in SITE_ORDER]))
 
+NNEIGHBORS_DOY =\
+    { 'quad_city' : 30, # could be 20
+      'las_vegas' : 100, # note in fidning this I bumped up NNEIGHBOR_TEST to np.concatenate(([10, 20], np.arange(50, 500, 50)))
+      'flagstaff' : 20, # checked
+      'kelowna' : 20, # checked
+      'great_falls' : 30, # checkde
+      'bergen' : 20, # checked
+      'spokane' : 30, # checked
+      'riverton' : 20, # checked
+      'elko' : 30, # checked
+      'lindenberg' : 20, # checked
+      'idar_oberstein' : 20, # checked
+      'milano' : 20, # checked
+     }
+
+NNEIGHBOR_TEST = np.concatenate(([5], np.arange(10, 110, 10)))
 
 def load_experiment(site, name):
     """Load experiment cooresponding to SITE and NAME."""
@@ -122,6 +138,8 @@ LAND_KEYS = {'T2', 'Tsoil', 'Ts', 'LAI', 'SM'} # should we include SM here?
                                                # linear
 CONTROL_KEYS = ATM_KEYS.union(LAND_KEYS)
 
+DOY_KEYS = {'SM', 'day'}
+
 def normalized_key(key):
     """return the normalized key from a standard key"""
     return '%s_normalized' % key
@@ -164,12 +182,12 @@ Also neighbors should be held out data."""
     predicts = np.squeeze(model.predict(X=prep_x_data(df.SM)))
     return np.average((predicts - df.ET)**2)
 
-def neighbor_error_f(n_neighbors, df):
+def neighbor_error_f(n_neighbors, df, keys=CONTROL_KEYS):
     """Return average of squared error for nneighbor and df"""
     if ((n_neighbors * 0.8) % 1) != 0.0:
         raise ValueError('n_neighbors not divisible by 5 for testing!')
     df = df.copy(deep=True)
-    df = fit_neighbors(normalized_prep(df), CONTROL_KEYS,
+    df = fit_neighbors(normalized_prep(df), keys,
                        'neighbors', normalized_key,
                        n_neighbors)
     n_samples = 5
@@ -185,7 +203,7 @@ def neighbor_error_f(n_neighbors, df):
         averages.append((sum_averages/float(n_samples)))
     return np.average(averages)
 
-def neighbor_effect(df, n_neighbors, n_neighbors_expert):
+def neighbor_effect(df, n_neighbors, n_neighbors_expert, n_neighbors_doy):
     """Perform 4 steps in my causal estimatation method:
 1. Normalize each confounder we're adjusting for. (this is more
    accepted method, but makes less snes to me for "nearness"
@@ -200,6 +218,14 @@ def neighbor_effect(df, n_neighbors, n_neighbors_expert):
     df['neighbor_effect_model'] = [model_neighbors(neighbors, df) for neighbors in
                                    df['neighbors']]
     df['neighbor_slope'] = [float(m.coef_) for m in df['neighbor_effect_model']]
+
+    (df) =\
+        fit_neighbors(df, DOY_KEYS,
+                      'neighbors_doy', normalized_key,
+                      n_neighbors)
+    df['neighbor_doy_effect_model'] = [model_neighbors(neighbors, df) for neighbors in
+                                       df['neighbors_doy']]
+    df['neighbor_doy_slope'] = [float(m.coef_) for m in df['neighbor_doy_effect_model']]
 
 
     wwilt = SITE_CONSTANTS.loc[site, 'wwilt']
@@ -268,11 +294,22 @@ Returns a dicntionary with data and slopes."""
     d['true_slopes'] = np.array([_df.slope.mean() for _df in samples])
     n_neighbors = NNEIGHBORS[site]
     n_neighbors_expert = NNEIGHBORS_EXPERT[site]
-    print("N neighbors for site %s: %d\n" % (site, n_neighbors))
-    print("N neighbors for site %s, expert: %d\n" % (site, n_neighbors_expert))
-    df = neighbor_effect(df, n_neighbors, n_neighbors_expert)
-    samples = [neighbor_effect(_df, n_neighbors, n_neighbors_expert)
-               for _df in samples]
+    n_neighbors_doy = NNEIGHBORS_DOY[site]
+    if not n_neighbors_doy:
+        plt.figure()
+        n_neighbors_test = NNEIGHBOR_TEST
+        plt.plot(n_neighbors_test, [neighbor_error_f(n, df, DOY_KEYS) for n in n_neighbors_test],'k*')
+        plt.ylabel('Average squared error per point')
+        plt.xlabel('N neighbors')
+        plt.title('%s, regular' % site)
+        plt.show()
+
+    if (n_neighbors and n_neighbors_expert and n_neighbors_doy):
+        print("N neighbors for site %s: %d\n" % (site, n_neighbors))
+        print("N neighbors for site %s, expert: %d\n" % (site, n_neighbors_expert))
+        df = neighbor_effect(df, n_neighbors, n_neighbors_expert, n_neighbors_doy)
+        samples = [neighbor_effect(_df, n_neighbors, n_neighbors_expert)
+                   for _df in samples]
     d['df'] = df
     d['samples'] = samples
     return d
@@ -394,8 +431,10 @@ As a side effect, may write a pickle file to data/SITE.pkl"""
                             'reality-slope']
         experiments = dict()
         for name in experiment_names:
-            experiments[name] = model_diagnostics(
-                fit_models(site, name))
+            #model_diagnostics(
+            experiments[name] = \
+                fit_models(site, name)
+                #)
         f = open(pkl_path(site), 'wb')
         pickle.dump(experiments, f)
         f.close()
@@ -570,10 +609,11 @@ SITES = dict()
 
 
 for site in stations.keys():
-    if CLEAN_SITES and os.path.exists(pkl_path(site)):
-        os.remove(pkl_path(site))
-    print('Working on %s\n' % site)
-    SITES[site] = site_analysis(site)
+    if site == 'las_vegas':
+        if CLEAN_SITES and os.path.exists(pkl_path(site)):
+            os.remove(pkl_path(site))
+        print('Working on %s\n' % site)
+        SITES[site] = site_analysis(site)
 
 
 
