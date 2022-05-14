@@ -15,7 +15,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.cluster import KMeans
 from sklearn.neighbors import NearestNeighbors
 
-CLEAN_SITES = True
+CLEAN_SITES = False
 data_dir = "./data"
 
 SITE_CONSTANTS = pd.read_csv('%s/site-constants.csv' % data_dir)
@@ -70,8 +70,6 @@ NNEIGHBORS =\
       'idar_oberstein' : 10,
       'milano' : 20,
      }
-
-NNEIGHBORS_DOY = dict(zip(SITE_ORDER, [False for _s in SITE_ORDER]))
 
 NNEIGHBORS_DOY =\
     { 'quad_city' : 30, # could be 20
@@ -295,21 +293,12 @@ Returns a dicntionary with data and slopes."""
     n_neighbors = NNEIGHBORS[site]
     n_neighbors_expert = NNEIGHBORS_EXPERT[site]
     n_neighbors_doy = NNEIGHBORS_DOY[site]
-    if not n_neighbors_doy:
-        plt.figure()
-        n_neighbors_test = NNEIGHBOR_TEST
-        plt.plot(n_neighbors_test, [neighbor_error_f(n, df, DOY_KEYS) for n in n_neighbors_test],'k*')
-        plt.ylabel('Average squared error per point')
-        plt.xlabel('N neighbors')
-        plt.title('%s, regular' % site)
-        plt.show()
-
-    if (n_neighbors and n_neighbors_expert and n_neighbors_doy):
-        print("N neighbors for site %s: %d\n" % (site, n_neighbors))
-        print("N neighbors for site %s, expert: %d\n" % (site, n_neighbors_expert))
-        df = neighbor_effect(df, n_neighbors, n_neighbors_expert, n_neighbors_doy)
-        samples = [neighbor_effect(_df, n_neighbors, n_neighbors_expert)
-                   for _df in samples]
+    print("N neighbors for site %s: %d\n" % (site, n_neighbors))
+    print("N neighbors for site %s, expert: %d\n" % (site, n_neighbors_expert))
+    print("N neighbors for site %s, doy: %d\n" % (site, n_neighbors_doy))
+    df = neighbor_effect(df, n_neighbors, n_neighbors_expert, n_neighbors_doy)
+    samples = [neighbor_effect(_df, n_neighbors, n_neighbors_expert, n_neighbors_doy)
+               for _df in samples]
     d['df'] = df
     d['samples'] = samples
     return d
@@ -332,7 +321,7 @@ def model_diagnostics(d):
 
 Mutates dictionary to add diagnostic terms.
 """
-    for slope_type in ['neighbor', 'expert_neighbor']:
+    for slope_type in ['neighbor', 'expert_neighbor', 'neighbor_doy']:
         df = d['df']
         samples = d['samples']
         d['%s_slope' % slope_type] = df['%s_slope' % slope_type].mean()
@@ -340,7 +329,7 @@ Mutates dictionary to add diagnostic terms.
             np.array([_df['%s_slope' % slope_type].mean()
                       for _df in samples])
 
-    for error_type in ['naive', 'expert_naive', 'neighbor', 'expert_neighbor']:
+    for error_type in ['naive', 'expert_naive', 'neighbor', 'expert_neighbor', 'neighbor_doy']:
         try:
             d['%s_error' % error_type] = d['%s_slope' % error_type] - d['true_slope']
             d['%s_errors' % error_type] = [x1 - x2 for (x1, x2) in
@@ -431,10 +420,8 @@ As a side effect, may write a pickle file to data/SITE.pkl"""
                             'reality-slope']
         experiments = dict()
         for name in experiment_names:
-            #model_diagnostics(
-            experiments[name] = \
-                fit_models(site, name)
-                #)
+            experiments[name] = model_diagnostics(
+                fit_models(site, name))
         f = open(pkl_path(site), 'wb')
         pickle.dump(experiments, f)
         f.close()
@@ -517,6 +504,13 @@ def slope_adjustment_box_plot(title=''):
         _df['site'] = site
         dfs.append(_df)
 
+        _df = pd.DataFrame(d['neighbor_doy_slopes'],
+                           columns=['dET/dSM'])
+        _df['slope type'] = 'adjusted\nby DOY'
+        _df['site'] = site
+        dfs.append(_df)
+
+
         # if site in ['elko', 'las_vegas']:
         _df = pd.DataFrame(d['expert_neighbor_slopes'],
                            columns=['dET/dSM'])
@@ -532,7 +526,7 @@ def slope_adjustment_box_plot(title=''):
     df = pd.concat(dfs, ignore_index=True)
     ax1 = sns.boxplot(x='site', y='dET/dSM', hue='slope type', data=df,
                       order=SITE_ORDER, ax=ax1,
-                      hue_order=['naive', 'adjusted', 'adjusted\nw/ expert', 'truth'])
+                      hue_order=['naive', 'adjusted', 'adjusted\nby DOY', 'adjusted\nw/ expert', 'truth'])
     ax1.set_ylabel('dET/dSM (slope)')
     ax1.set_xlabel('Site')
     plt.legend()
@@ -558,6 +552,12 @@ def error_adjustment_plot_absolute(title=''):
         _df['site'] = site
         dfs.append(_df)
 
+        _df = pd.DataFrame(np.absolute(d['neighbor_errors']),
+                           columns=['dET/dSM error'])
+        _df['error type'] = 'adjusted\nby DOY'
+        _df['site'] = site
+        dfs.append(_df)
+
         _df = pd.DataFrame(np.absolute(d['expert_neighbor_errors']),
                            columns=['dET/dSM error'])
         _df['error type'] = 'adjusted\nw/ expert'
@@ -567,7 +567,7 @@ def error_adjustment_plot_absolute(title=''):
     df = pd.concat(dfs, ignore_index=True)
     ax = sns.boxplot(x='site', y='dET/dSM error', hue='error type', data=df,
                      order=SITE_ORDER,
-                     hue_order=['naive', 'adjusted', 'adjusted\nw/ expert']
+                     hue_order=['naive', 'adjusted', 'adjusted\nby DOY', 'adjusted\nw/ expert']
                      )
     ax.set_ylabel('dET/dSM absolute error')
     ax.set_xlabel('Site')
@@ -609,11 +609,10 @@ SITES = dict()
 
 
 for site in stations.keys():
-    if site == 'las_vegas':
-        if CLEAN_SITES and os.path.exists(pkl_path(site)):
-            os.remove(pkl_path(site))
-        print('Working on %s\n' % site)
-        SITES[site] = site_analysis(site)
+    if CLEAN_SITES and os.path.exists(pkl_path(site)):
+        os.remove(pkl_path(site))
+    print('Working on %s\n' % site)
+    SITES[site] = site_analysis(site)
 
 
 
