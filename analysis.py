@@ -732,47 +732,6 @@ def t_from_theta_p(theta, p):
     """inverts `theta_from_t_p'. Theta in kelvin, pressure in pascal."""
     return theta * (p / 100000.0) ** (2.0 / 7.0)
 
-def summary_table(f):
-    """Make summary table, with one diagnost rh"""
-    f.write('variable &')
-    for site in SITE_ORDER[:-1]:
-        f.write(' %s &' % site)
-    f.write(' %s \\\\\n' % SITE_ORDER[-1])
-    f.write('\\midrule\n')
-    for key in CONSTANT_KEYS:
-        f.write('%s & ' % key)
-        for site in SITE_ORDER[:-1]:
-            f.write(' %5.2f &' % SITE_CONSTANTS.loc[site, key])
-        f.write(' %5.2f \\\\\n' % SITE_CONSTANTS.loc[SITE_ORDER[-1], key])
-    for key in STATISTICS_KEYS:
-        f.write('%s & ' % key)
-        for site in SITE_ORDER[:-1]:
-            ds = SITES[site]['reality-slope']['df'][key]
-            f.write(' %6.2f$\pm$%6.2f &' % (ds.mean(), ds.std()))
-        ds = SITES[SITE_ORDER[-1]]['reality-slope']['df'][key]
-        f.write(' %6.2f$\pm$%6.2f \\\\\n' % (ds.mean(), ds.std()))
-    f.write('rh & ')
-    for site in SITE_ORDER[:-1]:
-        _df = SITES[site]['reality-slope']['df']
-        rh = rh_from_t_a_q_p(_df['theta'],
-                             _df['q'] / 1000.0,
-                             _df['pressure']*100.0)
-        f.write(' %6.2f$\pm$%6.2f &' % (rh.mean(), rh.std()))
-    _df = SITES[SITE_ORDER[-1]]['reality-slope']['df']
-    rh = rh_from_t_a_q_p(_df['theta'],
-                         _df['q'] / 1000.0,
-                         _df['pressure']*100.0)
-    f.write(' %6.2f$\pm$%6.2f &' % (rh.mean(), rh.std()))
-    f.write('ws & ')
-    for site in SITE_ORDER[:-1]:
-        _df = SITES[site]['reality-slope']['df']
-        ws = np.sqrt(_df['u']**2 + _df['v']**2)
-        f.write(' %6.2f$\pm$%6.2f &' % (ws.mean(), ws.std()))
-    _df = SITES[SITE_ORDER[-1]]['reality-slope']['df']
-    ws = np.sqrt(_df['u']**2 + _df['v']**2)
-    f.write(' %6.2f$\pm$%6.2f &' % (ws.mean(), ws.std()))
-    return
-
 def site_comparison_figures():
     """Compare each site in a figure. For now, generate a spearate figure for each site"""
     for key in CONSTANT_KEYS:
@@ -847,9 +806,6 @@ cc
     return True
 
 df = concat_experiment('reality-slope')
-f = open('/home/adam/dissertation/tables/table3-1.tex', 'w')
-summary_table(f)
-f.close()
 # final_site_comparison_figures()
 
 # make this a scatter with site legend?
