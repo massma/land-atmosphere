@@ -504,13 +504,6 @@ def slope_adjustment_box_plot(title=''):
         _df['site'] = site
         dfs.append(_df)
 
-        _df = pd.DataFrame(d['neighbor_doy_slopes'],
-                           columns=['dET/dSM'])
-        _df['slope type'] = 'adjusted\nby DOY'
-        _df['site'] = site
-        dfs.append(_df)
-
-
         # if site in ['elko', 'las_vegas']:
         _df = pd.DataFrame(d['expert_neighbor_slopes'],
                            columns=['dET/dSM'])
@@ -526,7 +519,7 @@ def slope_adjustment_box_plot(title=''):
     df = pd.concat(dfs, ignore_index=True)
     ax1 = sns.boxplot(x='site', y='dET/dSM', hue='slope type', data=df,
                       order=SITE_ORDER, ax=ax1,
-                      hue_order=['naive', 'adjusted', 'adjusted\nby DOY', 'adjusted\nw/ expert', 'truth'])
+                      hue_order=['naive', 'adjusted', 'adjusted\nw/ expert', 'truth'])
     ax1.set_ylabel('dET/dSM (slope)')
     ax1.set_xlabel('Site')
     plt.legend()
@@ -552,12 +545,6 @@ def error_adjustment_plot_absolute(title=''):
         _df['site'] = site
         dfs.append(_df)
 
-        _df = pd.DataFrame(np.absolute(d['neighbor_errors']),
-                           columns=['dET/dSM error'])
-        _df['error type'] = 'adjusted\nby DOY'
-        _df['site'] = site
-        dfs.append(_df)
-
         _df = pd.DataFrame(np.absolute(d['expert_neighbor_errors']),
                            columns=['dET/dSM error'])
         _df['error type'] = 'adjusted\nw/ expert'
@@ -567,7 +554,7 @@ def error_adjustment_plot_absolute(title=''):
     df = pd.concat(dfs, ignore_index=True)
     ax = sns.boxplot(x='site', y='dET/dSM error', hue='error type', data=df,
                      order=SITE_ORDER,
-                     hue_order=['naive', 'adjusted', 'adjusted\nby DOY', 'adjusted\nw/ expert']
+                     hue_order=['naive', 'adjusted', 'adjusted\nw/ expert']
                      )
     ax.set_ylabel('dET/dSM absolute error')
     ax.set_xlabel('Site')

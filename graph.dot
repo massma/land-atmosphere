@@ -2,15 +2,15 @@ digraph G {
 
         climate[label="climate\n& interannual\nvariability"];
         season[label="season"];
-        LAI[label="LAI (t=0)"];
-        sm[label="SM(t=0)"];
-	et[label="average(ET(t>0))"];
-        groundTemperature[label="ground\ntemperature(t=0)"];
-        temperature[label="temperature\n(t=0)"];
-        humidity[label="humidity\n(t=0)"];
-        cloud[label="clouds\n(t=0)"];
-        wind[label="wind\n(t=0)"];
-        blheight[label="boundary\nlayer\nheight\n(t=0)"];
+        LAI[label="LAI (t=0)", style="filled"];
+        sm[label="SM(t=0)", shape="invhouse"];
+	et[label="evaporation(t>0)", shape="house"];
+        groundTemperature[label="ground\ntemperature(t=0)", style="filled"];
+        temperature[label="temperature\n(t=0)", style="filled"];
+        humidity[label="humidity\n(t=0)", style="filled"];
+        cloud[label="clouds\n(t=0)", style="filled"];
+        wind[label="wind\n(t=0)", style="filled"];
+        blheight[label="boundary\nlayer\nheight\n(t=0)", style="filled"];
 
         doy[label="day of\nyear"];
 
@@ -18,9 +18,11 @@ digraph G {
         climate -> season;
         climate -> temperature;
         climate -> humidity;
+        climate -> sm;
         climate -> cloud;
         climate -> wind;
         climate -> blheight;
+
 
         climate -> groundTemperature;
 

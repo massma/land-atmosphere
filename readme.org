@@ -1,3 +1,16 @@
 * Investigating land atmosphere interactions (and potentially causality) with MXLCH
+** Requirements
 
-  requirements: seaborn, pandas, sklearn, emacs, class4gl
+*** Reqirements (with Debian 11 Bullseye package name(s) in parenthesis)
+
+  - emacs (emacs)
+  - Python 3 (python3)
+  - pandas (python3-pandas)
+  - sklearn (python3-sklearn, python3-sklearn-pandas)
+  - numpy (python3-numpy)
+  - matplotlib w/ basemap (python3-matplotlib)
+  - cartopy (python3-cartopy, python-cartopy-data)
+
+*** Non-Debian requirements
+    - class4gl
+    - mxlch
