@@ -353,11 +353,20 @@ with regression fits overlaid"""
     fig = plt.figure()
     fig.set_figwidth(fig.get_figwidth()*2.0)
     axs = fig.subplots(nrows=1, ncols=2)
+    vmin = np.nan
+    vmax = np.nan
+    for key in experiments.keys():
+
+        vmin = min(vmin, experiments[key]['df']['slope'].min())
+        vmax = max(vmax, experiments[key]['df']['slope'].max())
     for (ax, scatter_name) in zip(axs, experiments.keys()):
         ax = sns.scatterplot(data=experiments[scatter_name]['df'],
-                                x='SM', y='ET', hue='slope', ax=ax)
+                                x='SM', y='ET', hue='slope', ax=ax,
+                             vmin=vmin, vmax=vmax)
         ax.set_title(scatter_name)
         ax.legend()
+        for im in ax.get_images():
+            im.set_clim(vmin, vmax)
     normalize_y_axis(*axs)
     plt.title(title)
     return
@@ -601,15 +610,14 @@ for site in stations.keys():
     print('Working on %s\n' % site)
     SITES[site] = site_analysis(site)
 
-
-
-# for (site, experiments) in SITES.items():
-    # print("*****%s******" % site)
-    # print('max site: %f' % experiments['reality-slope']['df']['sum_squared_error'].max())
-    # print('max site: %f\n' % experiments['randomized']['df']['sum_squared_error'].max())
+for (site, experiments) in SITES.items():
+    print("*****%s******" % site)
+    print('max site: %f' % experiments['reality-slope']['df']['sum_squared_error'].max())
+    print('max site: %f\n' % experiments['randomized']['df']['sum_squared_error'].max())
 
     # if site in {'spokane', 'flagstaff', 'elko', 'las_vegas', 'riverton', 'great_falls'}:
-    #     scatter_plot(experiments, title=site)
+
+    scatter_plot(experiments, title=site)
 
 def fraction_wilt(site):
     """Return the fraction of obs that are below wilting point for SITE"""
