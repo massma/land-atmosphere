@@ -5,3 +5,4 @@ old-data
 *.out
 *.png
 figs/*.pdf
+diagnostic_figures

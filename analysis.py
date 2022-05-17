@@ -104,8 +104,11 @@ def add_linear_regression(model, ax, name):
             label=name)
     ax.set_xlim(np.squeeze(xlim))
     return ax
-def true_slope(_df, name):
-    """Meant to be called on groupby(['year', 'doy']), wtih site NAME as argument"""
+
+FIG = plt.figure()
+
+def true_slope(_df, site, name):
+    """Meant to be called on groupby(['year', 'doy']), wtih SITE and experiment NAME as argument"""
     if _df.shape[0] < 3:
         return _df.head(n=1)
     else:
@@ -135,8 +138,8 @@ def true_slope(_df, name):
         ax.plot([sm_neg, sm_0, sm_pos], [et_neg, et_0, et_pos], 'k*')
         ax.set_title('Sum squared error: %f' % df_out['sum_squared_error'])
         add_linear_regression(m, ax, '')
-        plt.savefig('diagnostic_figures/%s/%06d_derivative_fit.png'
-                    % (name,  np.where(_df.experiment == 0)[0]))
+        plt.savefig('diagnostic_figures/%s-%s/%d-%03d_derivative_fit.png'
+                    % (site, name,  df_out.year.iloc[0], df_out.doy.iloc[0]))
         return df_out
 
 
@@ -288,7 +291,8 @@ def fit_models(site, name):
 Returns a dicntionary with data and slopes."""
     df = load_experiment(site, name)
     df['ws'] = np.sqrt(df.u**2 + df.v**2)
-    df = df.groupby(['year', 'doy']).apply(lambda x: true_slope(x, name))
+    os.makedirs('diagnostic_figures/%s-%s' % (site, name), exist_ok=True)
+    df = df.groupby(['year', 'doy']).apply(lambda _df: true_slope(_df, site, name))
     shape0 = df.shape[0]
     df = df[(~np.isnan(df.slope)) & (df['sum_squared_error'] <= 100.0)]
     print("Fraction of obs removed for 100 W^2/m4: %f\n" % (float(shape0 - df.shape[0])/shape0))
