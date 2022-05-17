@@ -15,7 +15,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.cluster import KMeans
 from sklearn.neighbors import NearestNeighbors
 
-CLEAN_SITES = False
+CLEAN_SITES = True
 data_dir = "./data"
 
 SITE_CONSTANTS = pd.read_csv('%s/site-constants.csv' % data_dir)
@@ -97,8 +97,15 @@ def prep_x_data(ds):
     """Take a dataseries DS and make it into the form needed by scikit fit."""
     return ds.to_numpy().reshape(-1, 1)
 
-def true_slope(_df):
-    """Meant to be called on groupby(['year', 'doy'])"""
+def add_linear_regression(model, ax, name):
+    """Add a fitted line from MODEL to AX, , and label it with NAME."""
+    xlim = np.array(ax.get_xlim()).reshape(-1, 1)
+    ax.plot(np.squeeze(xlim), np.squeeze(model.predict(xlim)),
+            label=name)
+    ax.set_xlim(np.squeeze(xlim))
+    return ax
+def true_slope(_df, name):
+    """Meant to be called on groupby(['year', 'doy']), wtih site NAME as argument"""
     if _df.shape[0] < 3:
         return _df.head(n=1)
     else:
@@ -123,6 +130,13 @@ def true_slope(_df):
         df_out['sm_neg'] = sm_neg
         df_out['et_pos'] = et_pos
         df_out['sm_pos'] = sm_pos
+        FIG.clf(True)
+        ax = FIG.add_subplot(111)
+        ax.plot([sm_neg, sm_0, sm_pos], [et_neg, et_0, et_pos], 'k*')
+        ax.set_title('Sum squared error: %f' % df_out['sum_squared_error'])
+        add_linear_regression(m, ax, '')
+        plt.savefig('diagnostic_figures/%s/%06d_derivative_fit.png'
+                    % (name,  np.where(_df.experiment == 0)[0]))
         return df_out
 
 
@@ -274,13 +288,16 @@ def fit_models(site, name):
 Returns a dicntionary with data and slopes."""
     df = load_experiment(site, name)
     df['ws'] = np.sqrt(df.u**2 + df.v**2)
-    df = df.groupby(['year', 'doy']).apply(true_slope)
+    df = df.groupby(['year', 'doy']).apply(lambda x: true_slope(x, name))
     shape0 = df.shape[0]
     df = df[(~np.isnan(df.slope)) & (df['sum_squared_error'] <= 100.0)]
-    # print("Fraction of obs removed: %f\n" % (float(shape0 - df.shape[0])/shape0))
+    print("Fraction of obs removed for 100 W^2/m4: %f\n" % (float(shape0 - df.shape[0])/shape0))
+    df = df[(~np.isnan(df.slope)) & (df['sum_squared_error'] <= 25.0)]
+    print("Fraction of obs removed for 25 W^2/m4: %f\n" % (float(shape0 - df.shape[0])/shape0))
+    print("size: %d" % df.shape[0])
     samples = [df.sample(n=df.shape[0],
-                              replace=True,
-                              random_state=RANDOM_STATE)
+                         replace=True,
+                         random_state=RANDOM_STATE)
                for i in range(NSAMPLE)]
     d = dict()
     d['naive_slope'] = naive_regression(df)
@@ -339,38 +356,20 @@ Mutates dictionary to add diagnostic terms.
             warnings.warn("key error in model diagnostics: %s" % error_type)
     return d
 
-def add_linear_regression(model, ax, name):
-    """Add a fitted line from MODEL to AX, , and label it with NAME."""
-    xlim = np.array(ax.get_xlim()).reshape(-1, 1)
-    ax.plot(np.squeeze(xlim), np.squeeze(model.predict(xlim)),
-            label=name)
-    ax.set_xlim(np.squeeze(xlim))
-    return ax
-
 def scatter_plot(experiments, title=''):
     """Return a two-panel scatter plot of DATA
 with regression fits overlaid"""
     fig = plt.figure()
     fig.set_figwidth(fig.get_figwidth()*2.0)
     axs = fig.subplots(nrows=1, ncols=2)
-    vmin = np.nan
-    vmax = np.nan
-    for key in experiments.keys():
-
-        vmin = min(vmin, experiments[key]['df']['slope'].min())
-        vmax = max(vmax, experiments[key]['df']['slope'].max())
     for (ax, scatter_name) in zip(axs, experiments.keys()):
         ax = sns.scatterplot(data=experiments[scatter_name]['df'],
-                                x='SM', y='ET', hue='slope', ax=ax,
-                             vmin=vmin, vmax=vmax)
+                                x='SM', y='ET', hue='slope', ax=ax)
         ax.set_title(scatter_name)
         ax.legend()
-        for im in ax.get_images():
-            im.set_clim(vmin, vmax)
     normalize_y_axis(*axs)
     plt.title(title)
     return
-
 
 CONCATS = dict()
 def concat_experiment(key):
@@ -801,7 +800,7 @@ cc
     return True
 
 df = concat_experiment('reality-slope')
-# final_site_comparison_figures()
+
 
 # make this a scatter with site legend?
 #
@@ -812,7 +811,7 @@ df = concat_experiment('reality-slope')
 #          'k.')
 # ax.set_ylabel('confounding error')
 # ax.set_xlabel('fraction of obs below wilting point')
-
+final_site_comparison_figures()
 slope_box_plot()
 error_plot_absolute()
 slope_adjustment_box_plot()
