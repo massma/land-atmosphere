@@ -6,3 +6,4 @@ old-data
 *.png
 figs/*.pdf
 diagnostic_figures
+delta*

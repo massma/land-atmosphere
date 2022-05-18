@@ -12,7 +12,7 @@ digraph G {
         wind[label="wind\n(t=0)", style="filled"];
         blheight[label="boundary\nlayer\nheight\n(t=0)", style="filled"];
 
-        doy[label="day of\nyear"];
+        doy[label="day of\nyear", style="filled"];
 
         doy -> season;
         climate -> season;

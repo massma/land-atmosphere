@@ -15,7 +15,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.cluster import KMeans
 from sklearn.neighbors import NearestNeighbors
 
-CLEAN_SITES = True
+CLEAN_SITES = False
 data_dir = "./data"
 
 SITE_CONSTANTS = pd.read_csv('%s/site-constants.csv' % data_dir)
@@ -73,7 +73,9 @@ NNEIGHBORS =\
 
 NNEIGHBORS_DOY =\
     { 'quad_city' : 30, # could be 20
-      'las_vegas' : 100, # note in fidning this I bumped up NNEIGHBOR_TEST to np.concatenate(([10, 20], np.arange(50, 500, 50)))
+      'las_vegas' : 100, # note in finding this I bumped up
+                         # NNEIGHBOR_TEST to np.concatenate(([10, 20],
+                         # np.arange(50, 500, 50)))
       'flagstaff' : 20, # checked
       'kelowna' : 20, # checked
       'great_falls' : 30, # checkde
@@ -298,6 +300,9 @@ Returns a dicntionary with data and slopes."""
     print("Fraction of obs removed for 100 W^2/m4: %f\n" % (float(shape0 - df.shape[0])/shape0))
     df = df[(~np.isnan(df.slope)) & (df['sum_squared_error'] <= 25.0)]
     print("Fraction of obs removed for 25 W^2/m4: %f\n" % (float(shape0 - df.shape[0])/shape0))
+    print("size: %d" % df.shape[0])
+    df = df[(~np.isnan(df.slope)) & (df['sum_squared_error'] <= 1.0)]
+    print("Fraction of obs removed for 1 W^2/m4: %f\n" % (float(shape0 - df.shape[0])/shape0))
     print("size: %d" % df.shape[0])
     samples = [df.sample(n=df.shape[0],
                          replace=True,
