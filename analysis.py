@@ -144,6 +144,7 @@ def true_slope(_df, site, name):
         df_out['sm_neg'] = sm_neg
         df_out['et_pos'] = et_pos
         df_out['sm_pos'] = sm_pos
+        df_out['slope_model'] = m
         FIG.clf(True)
         ax = FIG.add_subplot(111)
         ax.plot([sm_neg, sm_0, sm_pos], [et_neg, et_0, et_pos], 'k*')
@@ -154,11 +155,7 @@ def true_slope(_df, site, name):
         return df_out
 
 ATM_KEYS = {'theta', 'advtheta', 'q', 'advq', 'cc', 'ws', 'h', 'day'}
-LAND_KEYS = {'T2', 'Tsoil', 'Ts', 'LAI', 'SM'} # should we include SM here?
-                                               # it taints the idea of
-                                               # matching, but makes sense
-                                               # with the idea of piecewise
-                                               # linear
+LAND_KEYS = {'T2', 'Tsoil', 'Ts', 'LAI', 'SM'}
 CONTROL_KEYS = ATM_KEYS.union(LAND_KEYS)
 
 DOY_KEYS = {'SM', 'day'}
@@ -292,8 +289,8 @@ def expert_df(_df, site):
     _df = _df[(_df.SM > wwilt) & (_df.SM < wfc)]
     return _df
 
-def fit_models(site, name):
-    """fit models and calculate slopes for SITE and experiment NAME.
+def load_calculate_truth(site, name):
+    """lad data and calculate the true slope for SITE and experiment NAME.
 
 Returns a dicntionary with data and slopes."""
     df = load_experiment(site, name)
@@ -303,16 +300,18 @@ Returns a dicntionary with data and slopes."""
     shape0 = df.shape[0]
     df = df[(~np.isnan(df.slope))]
     print("Fraction of obs removed nan slopes: %f\n" % (float(shape0 - df.shape[0])/shape0))
-    if name == 'reality-slope':
-        n_neighbors = NNEIGHBORS[site]
-        n_neighbors_expert = NNEIGHBORS_EXPERT[site]
-        n_neighbors_doy = NNEIGHBORS_DOY[site]
-        print("N neighbors for site %s: %d\n" % (site, n_neighbors))
-        print("N neighbors for site %s, expert: %d\n" % (site, n_neighbors_expert))
-        print("N neighbors for site %s, doy: %d\n" % (site, n_neighbors_doy))
-        df = neighbor_effect(df, n_neighbors, n_neighbors_expert, n_neighbors_doy)
     return df
 
+def add_neighbor_fit(df, site):
+    """Add neighbor fit to site"""
+    n_neighbors = NNEIGHBORS[site]
+    n_neighbors_expert = NNEIGHBORS_EXPERT[site]
+    n_neighbors_doy = NNEIGHBORS_DOY[site]
+    print("N neighbors for site %s: %d\n" % (site, n_neighbors))
+    print("N neighbors for site %s, expert: %d\n" % (site, n_neighbors_expert))
+    print("N neighbors for site %s, doy: %d\n" % (site, n_neighbors_doy))
+    df = neighbor_effect(df, n_neighbors, n_neighbors_expert, n_neighbors_doy)
+    return df
 
 def rmse(truth, prediction):
     """Return the RMSE between TRUTH (dataseries) and PREDICTION (np array)"""
@@ -398,7 +397,10 @@ As a side effect, may write a pickle file to data/SITE.pkl"""
                             'reality-slope']
         experiments = dict()
         for name in experiment_names:
-            experiments[name] = fit_models(site, name)
+            _df = load_calculate_truth(site, name)
+            if name == 'reality-slope':
+                _df = add_neighbor_fit(df, site)
+            experiments[name] = _df
         f = open(pkl_path(site), 'wb')
         pickle.dump(experiments, f)
         f.close()
