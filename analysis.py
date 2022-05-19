@@ -18,7 +18,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.cluster import KMeans
 from sklearn.neighbors import NearestNeighbors
 
-CLEAN_SITES = False
+CLEAN_SITES = True
 data_dir = "./data"
 
 SITE_CONSTANTS = pd.read_csv('%s/site-constants.csv' % data_dir)
@@ -355,13 +355,6 @@ As a side effect, may write a pickle file to data/SITE.pkl"""
 
     if os.path.exists(pkl_path(site)):
         experiments = load_pickled_experiments(site)
-        _df = experiments['reality-slope']
-        # plot_neighbors(_df, site)
-        _df = add_neighbor_fit(_df, site)
-        experiments['reality-slope'] = _df
-        f = open(pkl_path(site), 'wb')
-        pickle.dump(experiments, f)
-        f.close()
     else:
         experiment_names = ['randomized',
                             'reality-slope']
