@@ -38,25 +38,26 @@ CONSTANT_KEYS = \
     'z0h',
     'z0m']
 
+# random state is used for plotting figures for NNEIGHBORS
 RANDOM_STATE = np.random.RandomState(0)
-# below site order is clusterd by similar climates
 
+# below site order is clusterd by similar climates
 SITE_ORDER = ['bergen', 'idar_oberstein', 'lindenberg', 'milano', 'kelowna',  'quad_city',
               'spokane', 'flagstaff', 'elko', 'las_vegas', 'riverton', 'great_falls' ]
 
 NNEIGHBORS =\
-    { 'quad_city' : 40, # checked, but could be 20, flat
-      'las_vegas' : 80, # checked
-      'flagstaff' : 50, # checked
-      'kelowna' : 20, # checked
-      'great_falls' : 30, # checked
-      'bergen' : 20, # checked
-      'spokane' : 30, # checked
-      'riverton' : 30, # checked
-      'elko' : 60, # checked
-      'lindenberg' : 20, # checked
-      'idar_oberstein' : 30, # checked
-      'milano' : 20, # checked
+    { 'quad_city' : 10, # checked, could be 20 (similar to idar_oberstein)
+      'las_vegas' : 10, # checked
+      'flagstaff' : 20, # checked
+      'kelowna' : 10, # checked
+      'great_falls' : 10, # checked
+      'bergen' : 10, # checked
+      'spokane' : 10, # checked
+      'riverton' : 20, # checked
+      'elko' : 20, # checked
+      'lindenberg' : 10, # checked
+      'idar_oberstein' : 10, # checked, could be 20
+      'milano' : 10, # checked
      }
 
 
@@ -134,7 +135,7 @@ def true_fit_figure(ds, site, name):
 def plot_neighbors(df, site):
     plt.figure()
     n_neighbors_test = NNEIGHBOR_TEST
-    plt.plot(n_neighbors_test, [neighbor_error_f(n, df, DOY_KEYS) for n in n_neighbors_test],'k*')
+    plt.plot(n_neighbors_test, [neighbor_error_f(n, df) for n in n_neighbors_test],'k*')
     plt.ylabel('Average squared error per point')
     plt.xlabel('N neighbors')
     plt.title('%s, regular' % site)
@@ -187,12 +188,12 @@ Also neighbors should be held out data."""
     predicts = np.squeeze(model.predict(X=prep_x_data(df.SM)))
     return np.average((predicts - df.ET)**2)
 
-def neighbor_error_f(n_neighbors, df, keys=CONTROL_KEYS):
+def neighbor_error_f(n_neighbors, df):
     """Return average of squared error for nneighbor and df"""
     if ((n_neighbors * 0.8) % 1) != 0.0:
         raise ValueError('n_neighbors not divisible by 5 for testing!')
     df = df.copy(deep=True)
-    df = fit_neighbors(normalized_prep(df), keys,
+    df = fit_neighbors(normalized_prep(df), CONTROL_KEYS,
                        'neighbors', normalized_key,
                        n_neighbors)
     n_samples = 5
@@ -208,7 +209,7 @@ def neighbor_error_f(n_neighbors, df, keys=CONTROL_KEYS):
         averages.append((sum_averages/float(n_samples)))
     return np.average(averages)
 
-def neighbor_effect(df, n_neighbors, n_neighbors_expert, n_neighbors_doy):
+def neighbor_effect(df, n_neighbors):
     """Perform 4 steps in my causal estimatation method:
 1. Normalize each confounder we're adjusting for. (this is more
    accepted method, but makes less snes to me for "nearness"
@@ -224,25 +225,6 @@ def neighbor_effect(df, n_neighbors, n_neighbors_expert, n_neighbors_doy):
                                    df['neighbors']]
     df['neighbor_slope'] = [float(m.coef_) for m in df['neighbor_effect_model']]
 
-    (df) =\
-        fit_neighbors(df, DOY_KEYS,
-                      'neighbors_doy', normalized_key,
-                      n_neighbors)
-    df['neighbor_doy_effect_model'] = [model_neighbors(neighbors, df) for neighbors in
-                                       df['neighbors_doy']]
-    df['neighbor_doy_slope'] = [float(m.coef_) for m in df['neighbor_doy_effect_model']]
-
-
-    wwilt = SITE_CONSTANTS.loc[site, 'wwilt']
-    wfc = SITE_CONSTANTS.loc[site, 'wfc']
-    df_expert = df.loc[(df.SM > wwilt) & (df.SM < wfc), :].copy(deep=True)
-    df_expert = fit_neighbors(normalized_prep(df_expert), CONTROL_KEYS, 'neighbors',
-                              normalized_key, n_neighbors_expert)
-    models = [model_neighbors(neighbors, df_expert) for neighbors in
-              df_expert['neighbors']]
-    slopes = [float(m.coef_) for m in models]
-    df['expert_neighbor_slope'] = 0.0
-    df.loc[(df.SM > wwilt) & (df.SM < wfc), 'expert_neighbor_slope'] = slopes
     return df
 
 def naive_regression(_df):
@@ -290,12 +272,8 @@ Returns a dicntionary with data and slopes."""
 def add_neighbor_fit(df, site):
     """Add neighbor fit to site"""
     n_neighbors = NNEIGHBORS[site]
-    n_neighbors_expert = NNEIGHBORS_EXPERT[site]
-    n_neighbors_doy = NNEIGHBORS_DOY[site]
     print("N neighbors for site %s: %d\n" % (site, n_neighbors))
-    print("N neighbors for site %s, expert: %d\n" % (site, n_neighbors_expert))
-    print("N neighbors for site %s, doy: %d\n" % (site, n_neighbors_doy))
-    df = neighbor_effect(df, n_neighbors, n_neighbors_expert, n_neighbors_doy)
+    df = neighbor_effect(df, n_neighbors)
     return df
 
 def rmse(truth, prediction):
@@ -378,8 +356,8 @@ As a side effect, may write a pickle file to data/SITE.pkl"""
     if os.path.exists(pkl_path(site)):
         experiments = load_pickled_experiments(site)
         _df = experiments['reality-slope']
-        plot_neighbors(df, site)
-        _df = add_neighbor_fit(df, site)
+        # plot_neighbors(_df, site)
+        _df = add_neighbor_fit(_df, site)
         experiments['reality-slope'] = _df
         f = open(pkl_path(site), 'wb')
         pickle.dump(experiments, f)
