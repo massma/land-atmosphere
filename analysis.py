@@ -10,12 +10,15 @@ import random
 import warnings
 sns.set_theme()
 
+# TODO: set up neighbor tests, and then add neighbor fit and re-save models.
+# then make figures
+
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from sklearn.cluster import KMeans
 from sklearn.neighbors import NearestNeighbors
 
-CLEAN_SITES = True
+CLEAN_SITES = False
 data_dir = "./data"
 
 SITE_CONSTANTS = pd.read_csv('%s/site-constants.csv' % data_dir)
@@ -37,56 +40,25 @@ CONSTANT_KEYS = \
 
 RANDOM_STATE = np.random.RandomState(0)
 # below site order is clusterd by similar climates
+
 SITE_ORDER = ['bergen', 'idar_oberstein', 'lindenberg', 'milano', 'kelowna',  'quad_city',
               'spokane', 'flagstaff', 'elko', 'las_vegas', 'riverton', 'great_falls' ]
 
-NNEIGHBORS_EXPERT =\
-    {
-      'quad_city' : 10,
-      'las_vegas' : 10,
-      'flagstaff' : 20,
-      'kelowna' : 10,
-      'great_falls' : 10,
-      'bergen' : 10,
-      'spokane' : 10,
-      'riverton' : 10,
-      'elko' : 20,
-      'lindenberg' : 10,
-      'idar_oberstein' : 10,
-      'milano' : 20,
-     }
-
 NNEIGHBORS =\
-    { 'quad_city' : 10,
-      'las_vegas' : 20,
-      'flagstaff' : 20,
-      'kelowna' : 10,
-      'great_falls' : 10,
-      'bergen' : 10,
-      'spokane' : 10,
-      'riverton' : 20,
-      'elko' : 30,
-      'lindenberg' : 10,
-      'idar_oberstein' : 10,
-      'milano' : 20,
-     }
-
-NNEIGHBORS_DOY =\
-    { 'quad_city' : 30, # could be 20
-      'las_vegas' : 100, # note in finding this I bumped up
-                         # NNEIGHBOR_TEST to np.concatenate(([10, 20],
-                         # np.arange(50, 500, 50)))
-      'flagstaff' : 20, # checked
+    { 'quad_city' : 40, # checked, but could be 20, flat
+      'las_vegas' : 80, # checked
+      'flagstaff' : 50, # checked
       'kelowna' : 20, # checked
-      'great_falls' : 30, # checkde
+      'great_falls' : 30, # checked
       'bergen' : 20, # checked
       'spokane' : 30, # checked
-      'riverton' : 20, # checked
-      'elko' : 30, # checked
+      'riverton' : 30, # checked
+      'elko' : 60, # checked
       'lindenberg' : 20, # checked
-      'idar_oberstein' : 20, # checked
+      'idar_oberstein' : 30, # checked
       'milano' : 20, # checked
      }
+
 
 NNEIGHBOR_TEST = np.concatenate(([5], np.arange(10, 110, 10)))
 
@@ -145,20 +117,33 @@ def true_slope(_df, site, name):
         df_out['et_pos'] = et_pos
         df_out['sm_pos'] = sm_pos
         df_out['slope_model'] = m
-        FIG.clf(True)
-        ax = FIG.add_subplot(111)
-        ax.plot([sm_neg, sm_0, sm_pos], [et_neg, et_0, et_pos], 'k*')
-        ax.set_title('Sum squared error: %f' % df_out['sum_squared_error'])
-        add_linear_regression(m, ax, '')
-        plt.savefig('diagnostic_figures/%s-%s/%d-%03d_derivative_fit.png'
-                    % (site, name,  df_out.year.iloc[0], df_out.doy.iloc[0]))
         return df_out
+
+def true_fit_figure(ds, site, name):
+    """plot the fit of a data series DS, for SITE and experiment NAME."""
+    FIG.clf(True)
+    ax = FIG.add_subplot(111)
+    ax.plot([ds['sm_neg'], ds['SM'], ds['sm_pos']],
+            [ds['et_neg'], ds['ET'], ds['et_pos']], 'k*')
+    ax.set_title('Sum squared error: %f' % ds['sum_squared_error'])
+    add_linear_regression(ds['slope_model'], ax, '')
+    plt.savefig('diagnostic_figures/%s-%s/%d-%03d_derivative_fit.png'
+                % (site, name,  ds.year, ds.doy))
+    return
+
+def plot_neighbors(df, site):
+    plt.figure()
+    n_neighbors_test = NNEIGHBOR_TEST
+    plt.plot(n_neighbors_test, [neighbor_error_f(n, df, DOY_KEYS) for n in n_neighbors_test],'k*')
+    plt.ylabel('Average squared error per point')
+    plt.xlabel('N neighbors')
+    plt.title('%s, regular' % site)
+    plt.show()
+    return True
 
 ATM_KEYS = {'theta', 'advtheta', 'q', 'advq', 'cc', 'ws', 'h', 'day'}
 LAND_KEYS = {'T2', 'Tsoil', 'Ts', 'LAI', 'SM'}
 CONTROL_KEYS = ATM_KEYS.union(LAND_KEYS)
-
-DOY_KEYS = {'SM', 'day'}
 
 def normalized_key(key):
     """return the normalized key from a standard key"""
@@ -392,6 +377,13 @@ As a side effect, may write a pickle file to data/SITE.pkl"""
 
     if os.path.exists(pkl_path(site)):
         experiments = load_pickled_experiments(site)
+        _df = experiments['reality-slope']
+        plot_neighbors(df, site)
+        _df = add_neighbor_fit(df, site)
+        experiments['reality-slope'] = _df
+        f = open(pkl_path(site), 'wb')
+        pickle.dump(experiments, f)
+        f.close()
     else:
         experiment_names = ['randomized',
                             'reality-slope']
