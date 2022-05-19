@@ -226,6 +226,7 @@ def set_minimum_wind(x):
 
 
 def set_minimum_ABL_height(x):
+    """MXLCH had some numerical instabilities with small zi"""
     return max(x, 40.0)
 
 def runtime(tstart):
@@ -235,7 +236,7 @@ Note simulation time finish will always be 1600 local,
 because at Kelowna this always ended at 16.049722, so we are conisstent with
 that forumulation.
 
-REDO: bump it up to 22 hrs local to get nighttime response."""
+"""
     return '%d' % round(np.ceil((3600.0 * (22.049722 - tstart))))
 
 def print_int(value):

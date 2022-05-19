@@ -329,6 +329,8 @@ it will return \"NaN\"."
   (forward-line 3)
   (move-beginning-of-line 1)
   (let ((time)
+        (lw-1 nil)
+        (lw nil)
         (count 0)
         (sum 0.0))
     (while (and
@@ -339,12 +341,23 @@ it will return \"NaN\"."
       (setq time (read (match-string 1)))
       (when (and (>= time 13.0)
                  (< time 17.0))
-        (dotimes (_x 8)
+        (dotimes (_x 5)
+          (re-search-forward (rx (* blank) (group (or "NaN" (+ (or num ?.)))))
+                              (line-end-position)
+                              t))
+        (setq lw (read (match-string 1)))
+        (unless lw-1
+          (setq lw-1 lw))
+        (cond
+         ((eq 'NaN lw) (setq sum 'NaN))
+         ((> (abs (- lw lw-1)) 200) (setq sum 'NaN))
+         (t (setq lw-1 lw)))
+        (dotimes (_x 3)
           (re-search-forward (rx (* blank) (group (or "NaN" (+ (or num ?.)))))
                               (line-end-position)
                               t))
         (let ((num (read (match-string 1))))
-          (if (eq 'NaN num)
+          (if (or (eq 'NaN num) (eq 'NaN sum))
               (setq sum 'NaN)
             (setq count (+ count 1))
             (setq sum (+ sum num)))))
@@ -1249,7 +1262,7 @@ and shifted by `mxlch-wthetasmax'/2)."
   defauls are taken from namoptions.hyyt."
   :type 'string
   :group 'mxlch)
-(defcustom mxlch-alpha2_ISO_high "0.023"
+(defcustom mxlnch-alpha2_ISO_high "0.023"
   "Undocumented in pdf, and no defaults in bulk_chemistry.f90, so
   defauls are taken from namoptions.hyyt."
   :type 'string

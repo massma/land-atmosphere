@@ -15,7 +15,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.cluster import KMeans
 from sklearn.neighbors import NearestNeighbors
 
-CLEAN_SITES = False
+CLEAN_SITES = True
 data_dir = "./data"
 
 SITE_CONSTANTS = pd.read_csv('%s/site-constants.csv' % data_dir)
@@ -129,8 +129,17 @@ def true_slope(_df, site, name):
         m.fit(X=xs, y=ys)
         df_out['slope'] = float(m.coef_)
         df_out['sum_squared_error'] = ((ys - m.predict(xs))**2).sum()
-        df_out['neg_difference'] = (et_0 - et_neg) / (sm_0 - sm_neg)
-        df_out['pos_difference'] = (et_pos - et_0) / (sm_pos - sm_0)
+        df_out['backward_difference'] = (et_0 - et_neg) / (sm_0 - sm_neg)
+        df_out['forward_difference'] = (et_pos - et_0) / (sm_pos - sm_0)
+        df_out['centered_difference'] = (et_pos - et_neg) / (sm_pos - sm_neg)
+        df_out['min_slope'] = np.amin([df_out['forward_difference'],
+                                       df_out['backward_difference'],
+                                       df_out['centered_difference'],
+                                       df_out['slope']])
+        df_out['max_slope'] = np.amax([df_out['forward_difference'],
+                                       df_out['backward_difference'],
+                                       df_out['centered_difference'],
+                                       df_out['slope']])
         df_out['et_neg'] = et_neg
         df_out['sm_neg'] = sm_neg
         df_out['et_pos'] = et_pos
@@ -143,9 +152,6 @@ def true_slope(_df, site, name):
         plt.savefig('diagnostic_figures/%s-%s/%d-%03d_derivative_fit.png'
                     % (site, name,  df_out.year.iloc[0], df_out.doy.iloc[0]))
         return df_out
-
-
-NSAMPLE = 50 # for bootstrap
 
 ATM_KEYS = {'theta', 'advtheta', 'q', 'advq', 'cc', 'ws', 'h', 'day'}
 LAND_KEYS = {'T2', 'Tsoil', 'Ts', 'LAI', 'SM'} # should we include SM here?
@@ -258,13 +264,12 @@ def neighbor_effect(df, n_neighbors, n_neighbors_expert, n_neighbors_doy):
     return df
 
 def naive_regression(_df):
-    """Calulcate a naive regression on _df. Return the slope.
+    """Calulcate a naive regression on _df. Return the model.
 
-In the future we could return the model, or a (slope, intercept)
-tuple"""
+"""
     m = LinearRegression()
     m.fit(X=prep_x_data(_df.SM), y=_df.ET)
-    return float(m.coef_)
+    return m
 
 def expert_naive_regression(_df, site):
     """Calulcate a naive regression on _df but using expert guidance to
@@ -296,38 +301,17 @@ Returns a dicntionary with data and slopes."""
     os.makedirs('diagnostic_figures/%s-%s' % (site, name), exist_ok=True)
     df = df.groupby(['year', 'doy']).apply(lambda _df: true_slope(_df, site, name))
     shape0 = df.shape[0]
-    df = df[(~np.isnan(df.slope)) & (df['sum_squared_error'] <= 100.0)]
-    print("Fraction of obs removed for 100 W^2/m4: %f\n" % (float(shape0 - df.shape[0])/shape0))
-    df = df[(~np.isnan(df.slope)) & (df['sum_squared_error'] <= 25.0)]
-    print("Fraction of obs removed for 25 W^2/m4: %f\n" % (float(shape0 - df.shape[0])/shape0))
-    print("size: %d" % df.shape[0])
-    df = df[(~np.isnan(df.slope)) & (df['sum_squared_error'] <= 1.0)]
-    print("Fraction of obs removed for 1 W^2/m4: %f\n" % (float(shape0 - df.shape[0])/shape0))
-    print("size: %d" % df.shape[0])
-    samples = [df.sample(n=df.shape[0],
-                         replace=True,
-                         random_state=RANDOM_STATE)
-               for i in range(NSAMPLE)]
-    d = dict()
-    d['naive_slope'] = naive_regression(df)
-    d['naive_slopes'] = np.array([naive_regression(_df) for _df in samples])
-    d['expert_naive_slope'] = expert_naive_regression(df, site)
-    d['expert_naive_slopes'] =\
-        np.array([expert_naive_regression(_df, site) for _df in samples])
-    d['true_slope'] = df.slope.mean()
-    d['true_slopes'] = np.array([_df.slope.mean() for _df in samples])
-    n_neighbors = NNEIGHBORS[site]
-    n_neighbors_expert = NNEIGHBORS_EXPERT[site]
-    n_neighbors_doy = NNEIGHBORS_DOY[site]
-    print("N neighbors for site %s: %d\n" % (site, n_neighbors))
-    print("N neighbors for site %s, expert: %d\n" % (site, n_neighbors_expert))
-    print("N neighbors for site %s, doy: %d\n" % (site, n_neighbors_doy))
-    df = neighbor_effect(df, n_neighbors, n_neighbors_expert, n_neighbors_doy)
-    samples = [neighbor_effect(_df, n_neighbors, n_neighbors_expert, n_neighbors_doy)
-               for _df in samples]
-    d['df'] = df
-    d['samples'] = samples
-    return d
+    df = df[(~np.isnan(df.slope))]
+    print("Fraction of obs removed nan slopes: %f\n" % (float(shape0 - df.shape[0])/shape0))
+    if name == 'reality-slope':
+        n_neighbors = NNEIGHBORS[site]
+        n_neighbors_expert = NNEIGHBORS_EXPERT[site]
+        n_neighbors_doy = NNEIGHBORS_DOY[site]
+        print("N neighbors for site %s: %d\n" % (site, n_neighbors))
+        print("N neighbors for site %s, expert: %d\n" % (site, n_neighbors_expert))
+        print("N neighbors for site %s, doy: %d\n" % (site, n_neighbors_doy))
+        df = neighbor_effect(df, n_neighbors, n_neighbors_expert, n_neighbors_doy)
+    return df
 
 
 def rmse(truth, prediction):
@@ -342,29 +326,6 @@ def cross_product(f, xs1, xs2):
     """Apply f to cross of xs1 and xs2"""
     return np.array([f(x1, x2) for x1 in xs1 for x2 in xs2])
 
-def model_diagnostics(d):
-    """Generate model diangostics for each dictionary (D) of an experiment.
-
-Mutates dictionary to add diagnostic terms.
-"""
-    for slope_type in ['neighbor', 'expert_neighbor', 'neighbor_doy']:
-        df = d['df']
-        samples = d['samples']
-        d['%s_slope' % slope_type] = df['%s_slope' % slope_type].mean()
-        d['%s_slopes' % slope_type] = \
-            np.array([_df['%s_slope' % slope_type].mean()
-                      for _df in samples])
-
-    for error_type in ['naive', 'expert_naive', 'neighbor', 'expert_neighbor', 'neighbor_doy']:
-        try:
-            d['%s_error' % error_type] = d['%s_slope' % error_type] - d['true_slope']
-            d['%s_errors' % error_type] = [x1 - x2 for (x1, x2) in
-                                           zip(d['%s_slopes' % error_type],
-                                               d['true_slopes'])]
-        except KeyError:
-            warnings.warn("key error in model diagnostics: %s" % error_type)
-    return d
-
 def scatter_plot(experiments, title=''):
     """Return a two-panel scatter plot of DATA
 with regression fits overlaid"""
@@ -372,8 +333,8 @@ with regression fits overlaid"""
     fig.set_figwidth(fig.get_figwidth()*2.0)
     axs = fig.subplots(nrows=1, ncols=2)
     for (ax, scatter_name) in zip(axs, experiments.keys()):
-        ax = sns.scatterplot(data=experiments[scatter_name]['df'],
-                                x='SM', y='ET', hue='slope', ax=ax)
+        ax = sns.scatterplot(data=experiments[scatter_name],
+                             x='SM', y='ET', hue='slope', ax=ax)
         ax.set_title(scatter_name)
         ax.legend()
     normalize_y_axis(*axs)
@@ -433,12 +394,11 @@ As a side effect, may write a pickle file to data/SITE.pkl"""
     if os.path.exists(pkl_path(site)):
         experiments = load_pickled_experiments(site)
     else:
-        experiment_names = [ 'randomized',
+        experiment_names = ['randomized',
                             'reality-slope']
         experiments = dict()
         for name in experiment_names:
-            experiments[name] = model_diagnostics(
-                fit_models(site, name))
+            experiments[name] = fit_models(site, name)
         f = open(pkl_path(site), 'wb')
         pickle.dump(experiments, f)
         f.close()
@@ -477,31 +437,6 @@ def slope_box_plot(title=''):
     plt.legend()
     plt.title(title)
     return
-
-def error_plot_absolute(title=''):
-    """make a box plot of error due to confounding and specification"""
-    fig, ax = plt.subplots()
-    dfs = c.deque()
-    for (site, experiments) in SITES.items():
-        _df = pd.DataFrame(np.absolute(experiments['randomized']['naive_errors']),
-                           columns=['dET/dSM error'])
-        _df['error type'] = 'specification'
-        _df['site'] = site
-        dfs.append(_df)
-        _df = pd.DataFrame(np.absolute(experiments['reality-slope']['naive_errors']),
-                           columns=['dET/dSM error'])
-        _df['error type'] = 'specification & confounding'
-        _df['site'] = site
-        dfs.append(_df)
-    df = pd.concat(dfs, ignore_index=True)
-    ax = sns.boxplot(x='site', y='dET/dSM error', hue='error type', data=df,
-                     order=SITE_ORDER)
-    ax.set_ylabel('dET/dSM absolute error')
-    ax.set_xlabel('Site')
-    plt.legend()
-    plt.title(title)
-    return
-
 
 def slope_adjustment_box_plot(title=''):
     """make a box plot of the true vs adjusted slopes for each site"""
@@ -542,6 +477,32 @@ def slope_adjustment_box_plot(title=''):
     plt.legend()
     plt.title(title)
     return
+
+def error_plot_absolute(title=''):
+    """make a box plot of error due to confounding and specification"""
+    fig, ax = plt.subplots()
+    dfs = c.deque()
+    for (site, experiments) in SITES.items():
+        _df = pd.DataFrame(np.absolute(experiments['randomized']['naive_errors']),
+                           columns=['dET/dSM error'])
+        _df['error type'] = 'specification'
+        _df['site'] = site
+        dfs.append(_df)
+        _df = pd.DataFrame(np.absolute(experiments['reality-slope']['naive_errors']),
+                           columns=['dET/dSM error'])
+        _df['error type'] = 'specification & confounding'
+        _df['site'] = site
+        dfs.append(_df)
+    df = pd.concat(dfs, ignore_index=True)
+    ax = sns.boxplot(x='site', y='dET/dSM error', hue='error type', data=df,
+                     order=SITE_ORDER)
+    ax.set_ylabel('dET/dSM absolute error')
+    ax.set_xlabel('Site')
+    plt.legend()
+    plt.title(title)
+    return
+
+
 
 def error_adjustment_plot_absolute(title=''):
     """make a box plot of error due to confounding and specification"""
@@ -619,11 +580,6 @@ for site in stations.keys():
     SITES[site] = site_analysis(site)
 
 for (site, experiments) in SITES.items():
-    print("*****%s******" % site)
-    print('max site: %f' % experiments['reality-slope']['df']['sum_squared_error'].max())
-    print('max site: %f\n' % experiments['randomized']['df']['sum_squared_error'].max())
-
-    # if site in {'spokane', 'flagstaff', 'elko', 'las_vegas', 'riverton', 'great_falls'}:
 
     scatter_plot(experiments, title=site)
 
