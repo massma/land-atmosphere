@@ -45,6 +45,9 @@ RANDOM_STATE = np.random.RandomState(0)
 SITE_ORDER = ['bergen', 'idar_oberstein', 'lindenberg', 'milano', 'kelowna',  'quad_city',
               'spokane', 'flagstaff', 'elko', 'las_vegas', 'riverton', 'great_falls' ]
 
+SITE_LABELS = ['Bergen', 'Idar\nOberstein', 'Lindenberg', 'Milano', 'Kelowna',  'Quad\nCity',
+              'Spokane', 'Flagstaff', 'Elko', 'Las\nVegas', 'Riverton', 'Great\nFalls' ]
+
 EXPERIMENT_NAMES = ['randomized', 'reality-slope']
 NNEIGHBORS =\
     { 'quad_city' : 10, # checked, could be 20 (similar to idar_oberstein)
@@ -81,7 +84,7 @@ def add_linear_regression(model, ax, name):
     ax.set_xlim(np.squeeze(xlim))
     return ax
 
-FIG = plt.figure()
+# FIG = plt.figure()
 
 def true_slope(_df, site, name):
     """Meant to be called on groupby(['year', 'doy']), wtih SITE and experiment NAME as argument"""
@@ -101,6 +104,8 @@ def true_slope(_df, site, name):
         xs = np.array([[sm_neg], [sm_0], [sm_pos]])
         ys = np.array([et_neg, et_0, et_pos])
         m.fit(X=xs, y=ys)
+        # note slope and centered difference the same, just lazy way
+        # to calc sum squared error
         df_out['slope'] = float(m.coef_)
         df_out['sum_squared_error'] = ((ys - m.predict(xs))**2).sum()
         df_out['backward_difference'] = (et_0 - et_neg) / (sm_0 - sm_neg)
@@ -317,7 +322,7 @@ always the same input. (a very bad idea)
     else:
         dfs = c.deque()
         for site in SITE_ORDER:
-            dfs.append(SITES[site][key]['df'])
+            dfs.append(SITES[site][key])
         df = pd.concat(dfs, ignore_index=True)
         CONCATS[key] = df
         return df
@@ -356,9 +361,6 @@ As a side effect, may write a pickle file to data/SITE.pkl"""
 
     if os.path.exists(pkl_path(site)):
         experiments = load_pickled_experiments(site)
-        _df = experiments['reality-slope']
-        plot_neighbors(_df, site)
-        plt.show()
     else:
         experiments = dict()
         for name in EXPERIMENT_NAMES:
@@ -525,22 +527,22 @@ for site in stations.keys():
     for exp in EXPERIMENT_NAMES:
         print("%s, %s size: %d" % (site, exp, SITES[site][exp].shape[0]))
 
-for (site, experiments) in SITES.items():
+# for (site, experiments) in SITES.items():
 
-    scatter_plot(experiments, title=site)
+#     scatter_plot(experiments, title=site)
 
-plt.show()
+# plt.show()
 
 def fraction_wilt(site):
     """Return the fraction of obs that are below wilting point for SITE"""
-    _df = SITES[site]['reality-slope']['df']
+    _df = SITES[site]['reality-slope']
     return (float(_df[_df.SM <
                       float(SITE_CONSTANTS.loc[site, 'wwilt'])].shape[0])
             / float(_df.shape[0]))
 
 def fraction_fc(site):
     """Return the fraction of obs that are above field capcaity for SITE"""
-    _df = SITES[site]['reality-slope']['df']
+    _df = SITES[site]['reality-slope']
     return (float(_df[_df.SM >
                       float(SITE_CONSTANTS.loc[site, 'wfc'])].shape[0])
             / float(_df.shape[0]))
@@ -714,10 +716,14 @@ cc
 
 df = concat_experiment('reality-slope')
 
-
-
+
+# reality decofounded figure
+# rea
+# prep
 fig = plt.figure()
-ax1 = fig.add_subplot(211)
+fig.set_figheight(fig.get_figheight()*3.0)
+fig.set_figwidth(fig.get_figwidth()*1.5)
+ax1 = fig.add_subplot(311)
 averages = np.array([SITES[site]['reality-slope'].slope.mean()
             for site in SITE_ORDER])
 lows = np.array([SITES[site]['reality-slope'].min_slope.mean()
@@ -734,24 +740,32 @@ de_highs = np.array([SITES[site]['randomized'].max_slope.mean()
                      for site in SITE_ORDER])
 de_naives = np.array([float(naive_regression(SITES[site]['randomized']).coef_)
                       for site in SITE_ORDER])
-
 xs = np.array([x for (site, x) in zip(SITE_ORDER, range(0, 100))])
-de_xs = xs + 0.1
-ax1.errorbar(xs - 0.1, averages, yerr=np.stack([averages - lows,
+# reality
+ax1.errorbar(xs, averages, yerr=np.stack([averages - lows,
                                                 highs - averages]),
-             fmt='.', label='Truth')
-ax1.plot(xs - 0.1, naives, '.', label='Naive')
-ax1.errorbar(de_xs, de_averages, yerr=np.stack([de_averages - de_lows,
-                                                de_highs - de_averages]),
-             fmt='.', label='De-confounded\nTruth')
-ax1.plot(de_xs, de_naives, '.', label='De-confounded Naive')
+             fmt='o', label='Truth')
+ax1.plot(xs, naives, 'o', label='Naive')
 ax1.set_xticks(xs)
-ax1.set_xticklabels(SITE_ORDER)
-ax1.legend()
-
-
-ax2 = fig.add_subplot(212)
+# ax1.set_xticklabels(['' for x in xs])
+ax1.set_xticklabels(SITE_LABELS)
+ax1.set_title('Realistic World')
+ax1.legend(loc=2)
+# deconfounded world
+ax2 = fig.add_subplot(312)
+ax2.errorbar(xs, de_averages, yerr=np.stack([de_averages - de_lows,
+                                             de_highs - de_averages]),
+             fmt='*', label='Truth')
+ax2.plot(xs, de_naives, '*', label='Naive')
+ax2.set_title('De-Confounded World')
+ax2.set_xticks(xs)
+# ax2.set_xticklabels(['' for x in xs])
+ax2.set_xticklabels(SITE_LABELS)
+ax2.legend()
+# error
+ax3 = fig.add_subplot(313)
 def error_f(estimate, low, high):
+    """returns error vien of ESTIMATE fiven LOW and HIGH bounds"""
     if (estimate < low):
         return low - estimate
     elif (estimate > high):
@@ -759,18 +773,65 @@ def error_f(estimate, low, high):
     else:
         return 0.0
 v_error_f = np.vectorize(error_f, otypes=[np.dtype('float64')])
-ax2.plot(xs, v_error_f(naives, lows, highs), 'ko', label="reality naive error")
-ax2.plot(xs, v_error_f(de_naives, de_lows, de_highs), 'm*', label="deconfounded naive error")
+ax3.plot(xs, v_error_f(naives, lows, highs), 'ko',
+         label="realistic world\n(specification + confounding error)")
+ax3.plot(xs, v_error_f(de_naives, de_lows, de_highs), 'm*',
+         label="deconfounded world\n(specification error)")
+ax3.set_xticks(xs)
+ax3.set_xticklabels(SITE_LABELS)
+ax3.legend()
+ax3.set_title('Naive Regression Error')
+plt.tight_layout()
+plt.savefig('figs/reality-deconfounded-comparison.pdf')
+
+
+# reality decofounded figure
+# rea
+# prep
+fig = plt.figure()
+fig.set_figheight(fig.get_figheight()*2.0)
+fig.set_figwidth(fig.get_figwidth()*1.5)
+ax1 = fig.add_subplot(211)
+adjusted = np.array([SITES[site]['reality-slope'].neighbor_slope.mean()
+                     for site in SITE_ORDER])
+xs = np.array([x for (site, x) in zip(SITE_ORDER, range(0, 100))])
+# reality
+ax1.errorbar(xs, averages, yerr=np.stack([averages - lows,
+                                          highs - averages]),
+             fmt='o', label='Truth')
+ax1.plot(xs, naives, 'o', label='Naive')
+ax1.plot(xs, adjusted, '*', label='Adjusted')
+ax1.set_xticks(xs)
+ax1.set_xticklabels(SITE_LABELS)
+ax1.set_title('Adjustment in the Realistic World')
+ax1.legend(loc=2)
+# error
+ax2 = fig.add_subplot(212)
+ax2.plot(xs, v_error_f(naives, lows, highs), 'ko',
+         label="Naive")
+ax2.plot(xs, v_error_f(adjusted, lows, highs), 'm*',
+         label="Adjusted")
 ax2.set_xticks(xs)
-ax2.set_xticklabels(SITE_ORDER)
+ax2.set_xticklabels(SITE_LABELS)
 ax2.legend()
-plt.show()
+ax2.set_title('Errors')
+plt.tight_layout()
+plt.savefig('figs/reality-adjustment-comparison.pdf')
 
-final_site_comparison_figures()
-error_plot_absolute()
-slope_adjustment_box_plot()
-error_adjustment_plot_absolute()
-plt.show()
+for site in SITE_ORDER:
+    _df = SITES[site]['reality-slope']
+    _df['daily_error'] = v_error_f(_df.neighbor_slope, _df.min_slope, _df.max_slope)
+    SITES[site]['reality-slope'] = _df
+    print('fraction of obs in bounds: %f'
+          % (_df[_df.daily_error == 0.0].shape[0] / _df.shape[0]))
+    plt.figure()
+    sns.histplot(data=_df, x='SM', y='daily_error')
+    plt.title(site)
 
-# hypthesis for spokane and great falls: less fraction sub wwilt than other sites
-# (and higher latitude/more seasonal cycle)
+df = concat_experiment('reality-slope')
+fig = plt.figure()
+ax = fig.add_subplot(111)
+ax = sns.boxplot(x='site', y='daily_error', data=df, order=SITE_ORDER, ax=ax, dodge=False)
+
+# final_site_comparison_figures()
+plt.show()
