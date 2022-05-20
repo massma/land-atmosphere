@@ -18,7 +18,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.cluster import KMeans
 from sklearn.neighbors import NearestNeighbors
 
-CLEAN_SITES = True
+CLEAN_SITES = False
 data_dir = "./data"
 
 SITE_CONSTANTS = pd.read_csv('%s/site-constants.csv' % data_dir)
@@ -48,7 +48,7 @@ SITE_ORDER = ['bergen', 'idar_oberstein', 'lindenberg', 'milano', 'kelowna',  'q
 EXPERIMENT_NAMES = ['randomized', 'reality-slope']
 NNEIGHBORS =\
     { 'quad_city' : 10, # checked, could be 20 (similar to idar_oberstein)
-      'las_vegas' : 10, # checked
+      'las_vegas' : 5, # checked
       'flagstaff' : 20, # checked
       'kelowna' : 10, # checked
       'great_falls' : 10, # checked
@@ -57,7 +57,7 @@ NNEIGHBORS =\
       'riverton' : 20, # checked
       'elko' : 20, # checked
       'lindenberg' : 10, # checked
-      'idar_oberstein' : 10, # checked, could be 20
+      'idar_oberstein' : 10, # checked
       'milano' : 10, # checked
      }
 
@@ -356,6 +356,9 @@ As a side effect, may write a pickle file to data/SITE.pkl"""
 
     if os.path.exists(pkl_path(site)):
         experiments = load_pickled_experiments(site)
+        _df = experiments['reality-slope']
+        plot_neighbors(_df, site)
+        plt.show()
     else:
         experiments = dict()
         for name in EXPERIMENT_NAMES:
@@ -376,31 +379,6 @@ def normalize_y_axis(ax1, ax2):
     ax1.set_ylim(lim)
     ax2.set_ylim(lim)
     return (ax1, ax2)
-
-def slope_box_plot(title=''):
-    """make a box plot of the true vs naive slopes for each site"""
-    fig = plt.figure()
-    ax1 = fig.subplots(nrows=1, ncols=1)
-    dfs = c.deque()
-    for (site, experiments) in SITES.items():
-        d = experiments['reality-slope']
-        _df = pd.DataFrame(d['naive_slopes'], columns=['dET/dSM'])
-        _df['slope type'] = 'naive'
-        _df['site'] = site
-        dfs.append(_df)
-        _df = pd.DataFrame(d['true_slopes'],
-                           columns=['dET/dSM'])
-        _df['slope type'] = 'truth'
-        _df['site'] = site
-        dfs.append(_df)
-    df = pd.concat(dfs, ignore_index=True)
-    ax1 = sns.boxplot(x='site', y='dET/dSM', hue='slope type', data=df,
-                      order=SITE_ORDER, ax=ax1)
-    ax1.set_ylabel('dET/dSM (slope)')
-    ax1.set_xlabel('Site')
-    plt.legend()
-    plt.title(title)
-    return
 
 def slope_adjustment_box_plot(title=''):
     """make a box plot of the true vs adjusted slopes for each site"""
@@ -737,17 +715,58 @@ cc
 df = concat_experiment('reality-slope')
 
 
-# make this a scatter with site legend?
-#
-# fig = plt.figure()
-# ax = fig.subplots(nrows=1, ncols=1)
-# ax.plot([fraction_wilt(site) for site in SITE_ORDER],
-#          [confounding_error(site) for site in SITE_ORDER],
-#          'k.')
-# ax.set_ylabel('confounding error')
-# ax.set_xlabel('fraction of obs below wilting point')
+
+fig = plt.figure()
+ax1 = fig.add_subplot(211)
+averages = np.array([SITES[site]['reality-slope'].slope.mean()
+            for site in SITE_ORDER])
+lows = np.array([SITES[site]['reality-slope'].min_slope.mean()
+        for site in SITE_ORDER])
+highs = np.array([SITES[site]['reality-slope'].max_slope.mean()
+                  for site in SITE_ORDER])
+naives = np.array([float(naive_regression(SITES[site]['reality-slope']).coef_)
+                   for site in SITE_ORDER])
+de_averages = np.array([SITES[site]['randomized'].slope.mean()
+                        for site in SITE_ORDER])
+de_lows = np.array([SITES[site]['randomized'].min_slope.mean()
+                    for site in SITE_ORDER])
+de_highs = np.array([SITES[site]['randomized'].max_slope.mean()
+                     for site in SITE_ORDER])
+de_naives = np.array([float(naive_regression(SITES[site]['randomized']).coef_)
+                      for site in SITE_ORDER])
+
+xs = np.array([x for (site, x) in zip(SITE_ORDER, range(0, 100))])
+de_xs = xs + 0.1
+ax1.errorbar(xs - 0.1, averages, yerr=np.stack([averages - lows,
+                                                highs - averages]),
+             fmt='.', label='Truth')
+ax1.plot(xs - 0.1, naives, '.', label='Naive')
+ax1.errorbar(de_xs, de_averages, yerr=np.stack([de_averages - de_lows,
+                                                de_highs - de_averages]),
+             fmt='.', label='De-confounded\nTruth')
+ax1.plot(de_xs, de_naives, '.', label='De-confounded Naive')
+ax1.set_xticks(xs)
+ax1.set_xticklabels(SITE_ORDER)
+ax1.legend()
+
+
+ax2 = fig.add_subplot(212)
+def error_f(estimate, low, high):
+    if (estimate < low):
+        return low - estimate
+    elif (estimate > high):
+        return estimate - high
+    else:
+        return 0.0
+v_error_f = np.vectorize(error_f, otypes=[np.dtype('float64')])
+ax2.plot(xs, v_error_f(naives, lows, highs), 'ko', label="reality naive error")
+ax2.plot(xs, v_error_f(de_naives, de_lows, de_highs), 'm*', label="deconfounded naive error")
+ax2.set_xticks(xs)
+ax2.set_xticklabels(SITE_ORDER)
+ax2.legend()
+plt.show()
+
 final_site_comparison_figures()
-slope_box_plot()
 error_plot_absolute()
 slope_adjustment_box_plot()
 error_adjustment_plot_absolute()
