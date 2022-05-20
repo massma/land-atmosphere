@@ -319,7 +319,7 @@ Would have to use a more sophisticated handler using sentinels in that case."
 (defun mxlch-extract-et (dir)
   "Extract et from output_land file in experiment DIR.
 
-Currently, this takes all data between 10 (inclusive) and 14 (exclusive)
+Currently, this takes all data between 1 (inclusive) and 17 (exclusive)
 local time, and averages it.
 
 It returns ET as a string, and if it encounters any NaN's,
@@ -330,12 +330,12 @@ it will return \"NaN\"."
   (move-beginning-of-line 1)
   (let ((time)
         (le)
+        (le-1 nil)
         (lw-1 nil)
         (lw nil)
         (sh nil)
         (sh-1 nil)
         (break nil)
-        (rs)
         (count 0)
         (sum 0.0)
         (search (lambda ()
@@ -360,16 +360,15 @@ it will return \"NaN\"."
         (setq sh-1 sh))
       (funcall search)
       (setq le (read (match-string 1)))
-      (dotimes (_x 3) (funcall search))
-      (setq rs (read (match-string 1)))
+      (unless le-1
+        (setq le-1 le))
       (cond
        ((eq 'NaN lw) (setq sum 'NaN))
        ((eq 'NaN sh) (setq sum 'NaN))
-       ((eq 'NaN rs) (setq sum 'NaN))
        ((eq 'NaN le) (setq sum 'NaN))
        ((> (abs (- lw lw-1)) 200) (setq sum 'NaN))
        ((> (abs (- sh sh-1)) 900) (setq sum 'NaN))
-       ((< rs 0.0) (setq sum 'NaN))
+       ((> (abs (- le le-1)) 450) (setq sum 'NaN))
        ((and (>= time 13.0)
              (< time 17.0))
         (setq count (+ count 1))
@@ -377,6 +376,7 @@ it will return \"NaN\"."
        ((> time 17.0) (setq break t))
        (t t ;; time < 13, do nothing
           ))
+      (setq le-1 le)
       (setq lw-1 lw)
       (setq sh-1 sh)
       (move-beginning-of-line 2))

@@ -10,8 +10,8 @@ import random
 import warnings
 sns.set_theme()
 
-# TODO: set up neighbor tests, and then add neighbor fit and re-save models.
-# then make figures
+#
+# make figures, investigate weirdness at milano, bergen, and lindenberg
 
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
@@ -45,6 +45,7 @@ RANDOM_STATE = np.random.RandomState(0)
 SITE_ORDER = ['bergen', 'idar_oberstein', 'lindenberg', 'milano', 'kelowna',  'quad_city',
               'spokane', 'flagstaff', 'elko', 'las_vegas', 'riverton', 'great_falls' ]
 
+EXPERIMENT_NAMES = ['randomized', 'reality-slope']
 NNEIGHBORS =\
     { 'quad_city' : 10, # checked, could be 20 (similar to idar_oberstein)
       'las_vegas' : 10, # checked
@@ -356,13 +357,11 @@ As a side effect, may write a pickle file to data/SITE.pkl"""
     if os.path.exists(pkl_path(site)):
         experiments = load_pickled_experiments(site)
     else:
-        experiment_names = ['randomized',
-                            'reality-slope']
         experiments = dict()
-        for name in experiment_names:
+        for name in EXPERIMENT_NAMES:
             _df = load_calculate_truth(site, name)
             if name == 'reality-slope':
-                _df = add_neighbor_fit(df, site)
+                _df = add_neighbor_fit(_df, site)
             experiments[name] = _df
         f = open(pkl_path(site), 'wb')
         pickle.dump(experiments, f)
@@ -544,9 +543,15 @@ for site in stations.keys():
     print('Working on %s\n' % site)
     SITES[site] = site_analysis(site)
 
+for site in stations.keys():
+    for exp in EXPERIMENT_NAMES:
+        print("%s, %s size: %d" % (site, exp, SITES[site][exp].shape[0]))
+
 for (site, experiments) in SITES.items():
 
     scatter_plot(experiments, title=site)
+
+plt.show()
 
 def fraction_wilt(site):
     """Return the fraction of obs that are below wilting point for SITE"""
