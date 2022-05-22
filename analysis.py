@@ -4,14 +4,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
+import scipy.stats
 import collections as c
 import seaborn as sns
 import random
 import warnings
 sns.set_theme()
-
-#
-# make figures, investigate weirdness at milano, bergen, and lindenberg
 
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
@@ -527,11 +525,43 @@ for site in stations.keys():
     for exp in EXPERIMENT_NAMES:
         print("%s, %s size: %d" % (site, exp, SITES[site][exp].shape[0]))
 
-# for (site, experiments) in SITES.items():
+for (site, experiments) in SITES.items():
+    print('\n****%s****' % site)
+    _df = experiments['reality-slope']
+    (pearson,p_pearson) = scipy.stats.pearsonr(_df.SM, _df.ET)
+    (kendall,p_kendall) = scipy.stats.kendalltau(_df.SM, _df.ET)
+    (spearman,p_spearman) = scipy.stats.spearmanr(_df.SM, _df.ET)
+    print('Difference betwee kendal (nonlinear) and pearson (linaer) for reality: %f'
+          % (kendall-pearson))
+    print('Difference betwee kendal (nonlinear) and pearson (linaer) for reality : %f'
+          % (spearman-pearson))
+    print('Difference betwee kendal (nonlinear) and pearson (linaer) for reality: %f'
+          % (p_pearson-p_kendall))
+    print('Difference betwee kendal (nonlinear) and pearson (linaer) for reality : %f'
+          % (p_pearson-p_spearman))
+    _df = experiments['randomized']
+    (de_pearson, de_p_pearson) = scipy.stats.pearsonr(_df.SM, _df.ET)
+    (de_kendall, de_p_kendall) = scipy.stats.kendalltau(_df.SM, _df.ET)
+    (de_spearman, de_p_spearman) = scipy.stats.spearmanr(_df.SM, _df.ET)
+    print('Difference betwee kendal (nonlinear) and pearson (linaer) for randomized: %f'
+          % (de_kendall-de_pearson))
+    print('Difference betwee kendal (nonlinear) and pearson (linaer) for randomized : %f'
+          % (de_spearman-de_pearson))
+    print('Difference betwee kendal (nonlinear) and pearson (linaer) for randomized: %f'
+          % (de_p_pearson-de_p_kendall))
+    print('Difference betwee spearman (nonlinear) and pearson (linaer) for randomized : %f'
+          % (de_p_pearson-de_p_spearman))
+    print('Kendall non-linearity (higher is more nonlinear): %f'
+          % ((de_kendall-de_pearson)-(kendall-pearson)))
+    print('Spearman non-linearity (higher is more nonlinear): %f'
+          % ((de_spearman-de_pearson)-(spearman-pearson)))
+    print('Kendall non-linearity probability (higher is more nonlinear): %f'
+          % ((de_p_pearson-de_p_kendall)-(p_pearson-p_kendall)))
+    print('Spearman non-linearity probability (higher is more nonlinear): %f'
+          % ((de_p_pearson-de_p_spearman)-(p_pearson-p_spearman)))
 
-#     scatter_plot(experiments, title=site)
-
-# plt.show()
+    scatter_plot(experiments, title=site)
+plt.show()
 
 def fraction_wilt(site):
     """Return the fraction of obs that are below wilting point for SITE"""
@@ -609,7 +639,6 @@ SITE_CLIMATES = \
 # greatfalls, but much more spread than elko, riverton, flagstaff and
 # lasvegas in thenon-zero slope region. basically just shifted more
 # arid than kelowna and lindenberg.
-
 
 STATISTICS_KEYS = \
    [ 'SM', 'ET', 'slope', 'T2', 'Tsoil', 'Ts', 'theta', 'q', 'LAI', 'cc', 'h', 'tstart', 'day']
@@ -817,21 +846,6 @@ ax2.legend()
 ax2.set_title('Errors')
 plt.tight_layout()
 plt.savefig('figs/reality-adjustment-comparison.pdf')
-
-for site in SITE_ORDER:
-    _df = SITES[site]['reality-slope']
-    _df['daily_error'] = v_error_f(_df.neighbor_slope, _df.min_slope, _df.max_slope)
-    SITES[site]['reality-slope'] = _df
-    print('fraction of obs in bounds: %f'
-          % (_df[_df.daily_error == 0.0].shape[0] / _df.shape[0]))
-    plt.figure()
-    sns.histplot(data=_df, x='SM', y='daily_error')
-    plt.title(site)
-
-df = concat_experiment('reality-slope')
-fig = plt.figure()
-ax = fig.add_subplot(111)
-ax = sns.boxplot(x='site', y='daily_error', data=df, order=SITE_ORDER, ax=ax, dodge=False)
 
 # final_site_comparison_figures()
 plt.show()
