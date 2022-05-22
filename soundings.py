@@ -475,11 +475,11 @@ SITE_KEY is a human name and must be a key in STATION_IDS
               (set(elisp_conversion.keys()) - VARIABLE_ELISP_KEYS))
 
 
-    write_experiment(lambda _df: '%s-reality-slope/%s_%04d_%03d_SM%d/variables.el'\
+    write_experiment(lambda _df: '%s-realistic/%s_%04d_%03d_SM%d/variables.el'\
                      % (site_key, site_key, _df.datetime.year, _df.doy, _df.experiment),
                      pandas_mapappend(df, slope_experiment))
 
-    write_experiment(lambda _df: '%s-randomized/%s_%04d_%03d_SM%d/variables.el'\
+    write_experiment(lambda _df: '%s-deconfounded/%s_%04d_%03d_SM%d/variables.el'\
                      % (site_key, site_key, _df.datetime.year, _df.doy, _df.experiment),
                      pandas_mapappend(randomize_soil_moisture(df),
                                       slope_experiment))

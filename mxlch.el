@@ -39,6 +39,20 @@ this file is!"
 (defconst mxlch-variable-input "variables.el"
   "The filename of variable input.")
 
+(defconst mxlch-sites
+  '("elko"
+    "bergen"
+    "flagstaff"
+    "great_falls"
+    "idar_oberstein"
+    "kelowna"
+    "las_vegas"
+    "lindenberg"
+    "milano"
+    "quad_city"
+    "riverton"
+    "spokane"))
+
 
 ;;;;  Utility functions
 (defun mxlch-generic-quarter (latlon f)
@@ -47,6 +61,22 @@ this file is!"
 F can be something like round, ceiling, floor."
   (number-to-string
    (+ 0.25 (* 0.5 (funcall f (* 2.0 (- latlon 0.25)))))))
+
+(defun mxlch-move-sites ()
+  "One-off utility function to move sites.  Keeping as an example."
+  (dolist (site mxlch-sites)
+    (rename-file (concat mxlch-data-dir "/" site "-reality-slope.csv")
+                 (concat mxlch-data-dir "/" site "-realistic.csv")
+                 nil)
+    (rename-file (concat mxlch-data-dir "/" site "-reality-slope")
+                 (concat mxlch-data-dir "/" site "-realistic")
+                 nil)
+    (rename-file (concat mxlch-data-dir "/" site "-randomized.csv")
+                 (concat mxlch-data-dir "/" site "-deconfounded.csv")
+                 nil)
+    (rename-file (concat mxlch-data-dir "/" site "-randomized")
+                 (concat mxlch-data-dir "/" site "-deconfounded")
+                 nil)))
 
 (defun mxlch-floor-quarter (latlon)
   "Calculate the nearest quarter degree of LATLON."
@@ -385,36 +415,6 @@ it will return \"NaN\"."
      ((eq 'NaN sum) "nan")
      ((= 0 count) "nan")
      (t (number-to-string (/ sum (float count)))))))
-
-(defun mxlch-test-extract-et ()
-  "Test the function `mxlch-extract-et'.
-
-TODO: update tests"
-  (if
-      (string= "nan"
-          (mxlch-extract-et
-           (file-name-directory
-            (concat
-             "/home/adam/land-atmosphere/data/reality/kelowna_71203_2010_098/"
-             mxlch-variable-input))))
-      'ok
-    (error
-     "FAILED TO PASS TEST ON:
- /home/adam/land-atmosphere/data/reality/kelowna_71203_2010_098"))
-  (if (string= "274.6017542083333"
-         (mxlch-extract-et
-          (file-name-directory
-           (concat
-            "/home/adam/land-atmosphere/data/causal/kelowna_71203_000019/"
-            mxlch-variable-input))))
-      'ok
-    (error
-     "FAILED TO PASS TEST ON:
-/home/adam/land-atmosphere/data/causal/kelowna_71203_000019")))
-
-(defun mxlch-run-tests ()
-  "Run every test in the mxlch package."
-  (mxlch-test-extract-et))
 
 (defun mxlch-sample (exp-path)
   "Get sample from EXP-PATH.

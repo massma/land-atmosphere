@@ -46,7 +46,7 @@ SITE_ORDER = ['bergen', 'idar_oberstein', 'lindenberg', 'milano', 'kelowna',  'q
 SITE_LABELS = ['Bergen', 'Idar\nOberstein', 'Lindenberg', 'Milano', 'Kelowna',  'Quad\nCity',
               'Spokane', 'Flagstaff', 'Elko', 'Las\nVegas', 'Riverton', 'Great\nFalls' ]
 
-EXPERIMENT_NAMES = ['randomized', 'reality-slope']
+EXPERIMENT_NAMES = ['deconfounded', 'realistic']
 NNEIGHBORS =\
     { 'quad_city' : 10, # checked, could be 20 (similar to idar_oberstein)
       'las_vegas' : 5, # checked
@@ -295,21 +295,22 @@ def cross_product(f, xs1, xs2):
 def scatter_plot(experiments, title=''):
     """Return a two-panel scatter plot of DATA
 with regression fits overlaid"""
-    fig = plt.figure()
+    fig = plt.figure(
     fig.set_figwidth(fig.get_figwidth()*2.0)
-    axs = fig.subplots(nrows=1, ncols=2)
-    for (ax, scatter_name) in zip(axs, experiments.keys()):
-        ax = sns.scatterplot(data=experiments[scatter_name],
-                             x='SM', y='ET', hue='slope', ax=ax)
-        ax.set_title(scatter_name)
-        ax.legend()
+    fig.set_figheight(fig.get_figheight()*2.0)
+    ax1 = fig.add_subplot(221)
+    ax1 = sns.scatterplot(data=experiments[],
+                          x='SM', y='ET', hue='slope', ax=ax)
+    ax.set_title(scatter_name)
+    ax.legend()
     normalize_y_axis(*axs)
+    normalize_x_axis(*axs)
     plt.title(title)
     return
 
 CONCATS = dict()
 def concat_experiment(key):
-    """Concat all experiments given by KEY ('reality-slope' or 'randomized').
+    """Concat all experiments given by KEY ('realistic' or 'deconfounded').
 
 This does a crude memoization to CONCATS, which assumes that sites is
 always the same input. (a very bad idea)
@@ -332,13 +333,13 @@ use swarm plot or strip plot."""
     fig = plt.figure()
     fig.set_figwidth(fig.get_figwidth()*2.0)
     (ax0, ax1) = fig.subplots(nrows=1, ncols=2)
-    _df = concat_experiment('reality-slope')
+    _df = concat_experiment('realistic')
     ax0 = sns.stripplot(data=_df, x='sum_squared_error', y='site', ax=ax0,
                         order=SITE_ORDER)
     ax0.set_title('Reality')
-    _df = concat_experiment('randomized')
+    _df = concat_experiment('deconfounded')
     ax1 = sns.stripplot(data=_df, x='sum_squared_error', y='site', ax=ax1)
-    ax1.set_title('Randomized')
+    ax1.set_title('Deconfounded')
     return
 
 def pkl_path(site):
@@ -363,7 +364,7 @@ As a side effect, may write a pickle file to data/SITE.pkl"""
         experiments = dict()
         for name in EXPERIMENT_NAMES:
             _df = load_calculate_truth(site, name)
-            if name == 'reality-slope':
+            if name == 'realistic':
                 _df = add_neighbor_fit(_df, site)
             experiments[name] = _df
         f = open(pkl_path(site), 'wb')
@@ -380,13 +381,22 @@ def normalize_y_axis(ax1, ax2):
     ax2.set_ylim(lim)
     return (ax1, ax2)
 
+def normalize_x_axis(ax1, ax2):
+    """make the limites of the x axis the same between AX1 and AX2"""
+    xlim1 = ax1.get_xlim()
+    xlim2 = ax2.get_xlim()
+    lim= [min(xlim1[0], xlim2[0]), max(xlim1[1], xlim2[1])]
+    ax1.set_xlim(lim)
+    ax2.set_xlim(lim)
+    return (ax1, ax2)
+
 def slope_adjustment_box_plot(title=''):
     """make a box plot of the true vs adjusted slopes for each site"""
     fig = plt.figure()
     ax1 = fig.subplots(nrows=1, ncols=1)
     dfs = c.deque()
     for (site, experiments) in SITES.items():
-        d = experiments['reality-slope']
+        d = experiments['realistic']
         _df = pd.DataFrame(d['naive_slopes'], columns=['dET/dSM'])
         _df['slope type'] = 'naive'
         _df['site'] = site
@@ -425,12 +435,12 @@ def error_plot_absolute(title=''):
     fig, ax = plt.subplots()
     dfs = c.deque()
     for (site, experiments) in SITES.items():
-        _df = pd.DataFrame(np.absolute(experiments['randomized']['naive_errors']),
+        _df = pd.DataFrame(np.absolute(experiments['deconfounded']['naive_errors']),
                            columns=['dET/dSM error'])
         _df['error type'] = 'specification'
         _df['site'] = site
         dfs.append(_df)
-        _df = pd.DataFrame(np.absolute(experiments['reality-slope']['naive_errors']),
+        _df = pd.DataFrame(np.absolute(experiments['realistic']['naive_errors']),
                            columns=['dET/dSM error'])
         _df['error type'] = 'specification & confounding'
         _df['site'] = site
@@ -451,7 +461,7 @@ def error_adjustment_plot_absolute(title=''):
     fig, ax = plt.subplots()
     dfs = c.deque()
     for (site, experiments) in SITES.items():
-        d = experiments['reality-slope']
+        d = experiments['realistic']
         _df = pd.DataFrame(np.absolute(d['naive_errors']),
                            columns=['dET/dSM error'])
         _df['error type'] = 'naive'
@@ -487,13 +497,13 @@ def error_plot(title=''):
     fig, ax = plt.subplots()
     dfs = c.deque()
     for (site, experiments) in SITES.items():
-        _df = pd.DataFrame(experiments['randomized']['naive_errors'],
+        _df = pd.DataFrame(experiments['deconfounded']['naive_errors'],
                            columns=['dET/dSM error'])
         _df['error type'] = 'specification'
 
         _df['site'] = site
         dfs.append(_df)
-        _df = pd.DataFrame(experiments['reality-slope']['naive_errors'],
+        _df = pd.DataFrame(experiments['realistic']['naive_errors'],
                            columns=['dET/dSM error'])
         _df['error type'] = 'specification & confounding'
         _df['site'] = site
@@ -527,7 +537,7 @@ for site in stations.keys():
 
 for (site, experiments) in SITES.items():
     print('\n****%s****' % site)
-    _df = experiments['reality-slope']
+    _df = experiments['realistic']
     (pearson,p_pearson) = scipy.stats.pearsonr(_df.SM, _df.ET)
     (kendall,p_kendall) = scipy.stats.kendalltau(_df.SM, _df.ET)
     (spearman,p_spearman) = scipy.stats.spearmanr(_df.SM, _df.ET)
@@ -539,17 +549,17 @@ for (site, experiments) in SITES.items():
           % (p_pearson-p_kendall))
     print('Difference betwee kendal (nonlinear) and pearson (linaer) for reality : %f'
           % (p_pearson-p_spearman))
-    _df = experiments['randomized']
+    _df = experiments['deconfounded']
     (de_pearson, de_p_pearson) = scipy.stats.pearsonr(_df.SM, _df.ET)
     (de_kendall, de_p_kendall) = scipy.stats.kendalltau(_df.SM, _df.ET)
     (de_spearman, de_p_spearman) = scipy.stats.spearmanr(_df.SM, _df.ET)
-    print('Difference betwee kendal (nonlinear) and pearson (linaer) for randomized: %f'
+    print('Difference betwee kendal (nonlinear) and pearson (linaer) for deconfounded: %f'
           % (de_kendall-de_pearson))
-    print('Difference betwee kendal (nonlinear) and pearson (linaer) for randomized : %f'
+    print('Difference betwee kendal (nonlinear) and pearson (linaer) for deconfounded : %f'
           % (de_spearman-de_pearson))
-    print('Difference betwee kendal (nonlinear) and pearson (linaer) for randomized: %f'
+    print('Difference betwee kendal (nonlinear) and pearson (linaer) for deconfounded: %f'
           % (de_p_pearson-de_p_kendall))
-    print('Difference betwee spearman (nonlinear) and pearson (linaer) for randomized : %f'
+    print('Difference betwee spearman (nonlinear) and pearson (linaer) for deconfounded : %f'
           % (de_p_pearson-de_p_spearman))
     print('Kendall non-linearity (higher is more nonlinear): %f'
           % ((de_kendall-de_pearson)-(kendall-pearson)))
@@ -559,20 +569,20 @@ for (site, experiments) in SITES.items():
           % ((de_p_pearson-de_p_kendall)-(p_pearson-p_kendall)))
     print('Spearman non-linearity probability (higher is more nonlinear): %f'
           % ((de_p_pearson-de_p_spearman)-(p_pearson-p_spearman)))
-
     scatter_plot(experiments, title=site)
+
 plt.show()
 
 def fraction_wilt(site):
     """Return the fraction of obs that are below wilting point for SITE"""
-    _df = SITES[site]['reality-slope']
+    _df = SITES[site]['realistic']
     return (float(_df[_df.SM <
                       float(SITE_CONSTANTS.loc[site, 'wwilt'])].shape[0])
             / float(_df.shape[0]))
 
 def fraction_fc(site):
     """Return the fraction of obs that are above field capcaity for SITE"""
-    _df = SITES[site]['reality-slope']
+    _df = SITES[site]['realistic']
     return (float(_df[_df.SM >
                       float(SITE_CONSTANTS.loc[site, 'wfc'])].shape[0])
             / float(_df.shape[0]))
@@ -681,7 +691,7 @@ def site_comparison_figures():
         ax.set_title(key)
         ax.set_ylabel(key)
         ax.set_xlabel(key)
-    df = concat_experiment('reality-slope')
+    df = concat_experiment('realistic')
     df['rh'] = rh_from_t_a_q_p(df['theta'],
                                df['q'] / 1000.0,
                                df['pressure']*100.0)
@@ -696,10 +706,10 @@ def site_comparison_figures():
     return
 
 def confounding_error(site):
-    """Return the difference in absolute error between naiv-slope and randomized
+    """Return the difference in absolute error between naiv-slope and deconfounded
     for SITE"""
-    err = np.absolute(SITES[site]['reality-slope']['naive_error']) -\
-          np.absolute(SITES[site]['randomized']['naive_error'])
+    err = np.absolute(SITES[site]['realistic']['naive_error']) -\
+          np.absolute(SITES[site]['deconfounded']['naive_error'])
     return err
 
 def final_site_comparison_figures():
@@ -718,7 +728,7 @@ rh
 cc
 
     """
-    df = concat_experiment('reality-slope')
+    df = concat_experiment('realistic')
     df['rh'] = rh_from_t_a_q_p(df['theta'],
                                df['q'] / 1000.0,
                                df['pressure']*100.0)
@@ -743,7 +753,7 @@ cc
         ax.legend([], [], frameon=False)
     return True
 
-df = concat_experiment('reality-slope')
+df = concat_experiment('realistic')
 
 
 # reality decofounded figure
@@ -753,21 +763,21 @@ fig = plt.figure()
 fig.set_figheight(fig.get_figheight()*3.0)
 fig.set_figwidth(fig.get_figwidth()*1.5)
 ax1 = fig.add_subplot(311)
-averages = np.array([SITES[site]['reality-slope'].slope.mean()
+averages = np.array([SITES[site]['realistic'].slope.mean()
             for site in SITE_ORDER])
-lows = np.array([SITES[site]['reality-slope'].min_slope.mean()
+lows = np.array([SITES[site]['realistic'].min_slope.mean()
         for site in SITE_ORDER])
-highs = np.array([SITES[site]['reality-slope'].max_slope.mean()
+highs = np.array([SITES[site]['realistic'].max_slope.mean()
                   for site in SITE_ORDER])
-naives = np.array([float(naive_regression(SITES[site]['reality-slope']).coef_)
+naives = np.array([float(naive_regression(SITES[site]['realistic']).coef_)
                    for site in SITE_ORDER])
-de_averages = np.array([SITES[site]['randomized'].slope.mean()
+de_averages = np.array([SITES[site]['deconfounded'].slope.mean()
                         for site in SITE_ORDER])
-de_lows = np.array([SITES[site]['randomized'].min_slope.mean()
+de_lows = np.array([SITES[site]['deconfounded'].min_slope.mean()
                     for site in SITE_ORDER])
-de_highs = np.array([SITES[site]['randomized'].max_slope.mean()
+de_highs = np.array([SITES[site]['deconfounded'].max_slope.mean()
                      for site in SITE_ORDER])
-de_naives = np.array([float(naive_regression(SITES[site]['randomized']).coef_)
+de_naives = np.array([float(naive_regression(SITES[site]['deconfounded']).coef_)
                       for site in SITE_ORDER])
 xs = np.array([x for (site, x) in zip(SITE_ORDER, range(0, 100))])
 # reality
@@ -821,7 +831,7 @@ fig = plt.figure()
 fig.set_figheight(fig.get_figheight()*2.0)
 fig.set_figwidth(fig.get_figwidth()*1.5)
 ax1 = fig.add_subplot(211)
-adjusted = np.array([SITES[site]['reality-slope'].neighbor_slope.mean()
+adjusted = np.array([SITES[site]['realistic'].neighbor_slope.mean()
                      for site in SITE_ORDER])
 xs = np.array([x for (site, x) in zip(SITE_ORDER, range(0, 100))])
 # reality
