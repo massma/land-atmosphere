@@ -46,6 +46,7 @@ SITE_ORDER = ['bergen', 'idar_oberstein', 'lindenberg', 'milano', 'kelowna',  'q
 SITE_LABELS = ['Bergen', 'Idar\nOberstein', 'Lindenberg', 'Milano', 'Kelowna',  'Quad\nCity',
               'Spokane', 'Flagstaff', 'Elko', 'Las\nVegas', 'Riverton', 'Great\nFalls' ]
 
+SITE_TITLE = dict(zip(SITE_ORDER, SITE_LABELS))
 EXPERIMENT_NAMES = ['deconfounded', 'realistic']
 NNEIGHBORS =\
     { 'quad_city' : 10, # checked, could be 20 (similar to idar_oberstein)
@@ -292,20 +293,48 @@ def cross_product(f, xs1, xs2):
     """Apply f to cross of xs1 and xs2"""
     return np.array([f(x1, x2) for x1 in xs1 for x2 in xs2])
 
-def scatter_plot(experiments, title=''):
+def scatter_plot(experiments, site=''):
     """Return a two-panel scatter plot of DATA
 with regression fits overlaid"""
-    fig = plt.figure(
+    fig = plt.figure()
     fig.set_figwidth(fig.get_figwidth()*2.0)
     fig.set_figheight(fig.get_figheight()*2.0)
     ax1 = fig.add_subplot(221)
-    ax1 = sns.scatterplot(data=experiments[],
-                          x='SM', y='ET', hue='slope', ax=ax)
-    ax.set_title(scatter_name)
-    ax.legend()
-    normalize_y_axis(*axs)
-    normalize_x_axis(*axs)
-    plt.title(title)
+    _df = experiments['deconfounded']
+    ax1 = sns.scatterplot(data=_df,
+                          x='SM', y='ET', hue='slope', ax=ax1)
+    model = naive_regression(_df)
+    add_linear_regression(model, ax1, '')
+    ax1.set_title('Deconfounded World (%s)' % SITE_TITLE[site].replace('\n', ' '))
+    ax1.set_ylabel('Evaporation (W/m2)')
+    ax1.set_xlabel('')
+    deconfounded_residuals = _df.ET - np.squeeze(model.predict(prep_x_data(_df.SM)))
+    ax3 = fig.add_subplot(223)
+    ax3 = sns.scatterplot(x=_df.SM, y=deconfounded_residuals, ax=ax3)
+    ax3.set_xlabel("Soil Moisture (volumetric fraction)")
+    ax3.set_ylabel('Evaporation Residuals (W/m2)')
+    ax2 = fig.add_subplot(222)
+    _df = experiments['realistic']
+    ax2 = sns.scatterplot(data=_df,
+                          x='SM', y='ET', hue='slope', ax=ax2)
+    model = naive_regression(_df)
+    realistic_residuals = _df.ET - np.squeeze(model.predict(prep_x_data(_df.SM)))
+    add_linear_regression(model, ax2, '')
+    ax2.set_title('Realistic World (%s)' % SITE_TITLE[site].replace('\n', ' '))
+    ax2.set_ylabel('')
+    ax2.set_xlabel('')
+
+    ax4 = fig.add_subplot(224)
+    ax4 = sns.scatterplot(x=_df.SM, y=realistic_residuals, ax=ax4)
+    ax4.set_xlabel("Soil Moisture (volumetric fraction)")
+    ax4.set_ylabel('')
+
+    normalize_y_axis(ax1, ax2)
+    normalize_x_axis(ax1, ax2)
+    normalize_y_axis(ax3, ax4)
+    normalize_x_axis(ax3, ax4)
+    plt.tight_layout()
+    plt.savefig('figs/scatter-%s.pdf' % site)
     return
 
 CONCATS = dict()
@@ -569,9 +598,7 @@ for (site, experiments) in SITES.items():
           % ((de_p_pearson-de_p_kendall)-(p_pearson-p_kendall)))
     print('Spearman non-linearity probability (higher is more nonlinear): %f'
           % ((de_p_pearson-de_p_spearman)-(p_pearson-p_spearman)))
-    scatter_plot(experiments, title=site)
-
-plt.show()
+    scatter_plot(experiments, site)
 
 def fraction_wilt(site):
     """Return the fraction of obs that are below wilting point for SITE"""
@@ -842,6 +869,7 @@ ax1.plot(xs, naives, 'o', label='Naive')
 ax1.plot(xs, adjusted, '*', label='Adjusted')
 ax1.set_xticks(xs)
 ax1.set_xticklabels(SITE_LABELS)
+ax1.set_ylabel('Slope term (W m$^{-2})$')
 ax1.set_title('Adjustment in the Realistic World')
 ax1.legend(loc=2)
 # error
@@ -852,10 +880,45 @@ ax2.plot(xs, v_error_f(adjusted, lows, highs), 'm*',
          label="Adjusted")
 ax2.set_xticks(xs)
 ax2.set_xticklabels(SITE_LABELS)
+ax2.set_ylabel('Mean Absolute Error (W m$^{-2}$)')
 ax2.legend()
 ax2.set_title('Errors')
 plt.tight_layout()
 plt.savefig('figs/reality-adjustment-comparison.pdf')
 
-# final_site_comparison_figures()
+
+fig = plt.figure()
+fig.set_figheight(fig.get_figheight()*2.0)
+df = SITES['flagstaff']['realistic']
+ds = df.loc[(1998, 242)].iloc[0]
+ax = fig.add_subplot(211)
+ax.plot([ds['sm_neg'], ds['SM'], ds['sm_pos']],
+        [ds['et_neg'], ds['ET'], ds['et_pos']], 'k*')
+ax.plot([ds['sm_neg'], ds['SM']],
+        [ds['et_neg'], ds['ET']], '--', label='backward difference')
+add_linear_regression(ds['slope_model'], ax, 'centered difference')
+ax.plot([ds['SM'], ds['sm_pos']],
+        [ds['ET'], ds['et_pos']], '-.', label='forward difference')
+
+ax.set_title('Flagstaff on Julian day %d of year %d' % (ds.day, ds.year))
+ax.set_ylabel('Evaporation (W m$^{-2}$)')
+ds = df.loc[(1998, 256)].iloc[0]
+ax = fig.add_subplot(212)
+ax.plot([ds['sm_neg'], ds['SM'], ds['sm_pos']],
+        [ds['et_neg'], ds['ET'], ds['et_pos']], 'k*')
+ax.plot([ds['sm_neg'], ds['SM']],
+        [ds['et_neg'], ds['ET']], '--', label='backward difference')
+add_linear_regression(ds['slope_model'], ax, 'centered difference')
+ax.plot([ds['SM'], ds['sm_pos']],
+        [ds['ET'], ds['et_pos']], '-.', label='forward difference')
+ax.set_title('Flagstaff on Julian day %d of year %d' % (ds.day, ds.year))
+ax.set_ylabel('Evaporation (W m$^{-2}$)')
+ax.set_xlabel('Soil Moisture (Volumetric Fraction)')
+ax.legend()
+
+plt.savefig('figs/true-fit.pdf')
 plt.show()
+
+# final_site_comparison_figures()
+plt.close('all')
+# plt.show()
