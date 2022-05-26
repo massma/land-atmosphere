@@ -1,5 +1,14 @@
+NEEDS = figs \
+	diagnostic_figures \
+	data \
+	figs/graph.png \
+	figs/graph.pdf \
+	data/1976-2000_ASCII.txt.gz \
+	figs/map.pdf \
+	figs/simulations.pdf \
+	figs/simulations.png
 
-all : figs diagnostic_figures data figs/graph.png figs/graph.pdf data/1976-2000_ASCII.txt.gz figs/map.pdf
+all : $(NEEDS)
 
 figs :
 	mkdir -p $@
@@ -20,6 +29,12 @@ figs/graph.pdf : graph.dot
 	dot -o $@ -Tpdf $<
 
 figs/graph.png : graph.dot
+	dot -o $@ -Tpng $<
+
+figs/simulations.pdf : simulations.dot
+	dot -o $@ -Tpdf $<
+
+figs/simulations.png : simulations.dot
 	dot -o $@ -Tpng $<
 
 figs/map.pdf : map.py

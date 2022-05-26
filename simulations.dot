@@ -1,0 +1,22 @@
+digraph G {
+
+        class[label="CLASS4GL & CLASS"];
+        realistic[label="Realistic\nWorld\n(unaltered\nCLASS4GL\nforcing)"];
+        deconfounded[label="Deconfounded\nWorld\n(soil\nmoisture\nsampled\nindependently\nfrom other\ninitial/boundary\nconditions)"];
+        naive[label="Naive causal slope:\nLinear\nregression of\nevaporation on\nsoil moisture"];
+        naive_de[label="Naive causal slope:\nLinear\nregression of\nevaporation on\nsoil moisture"];
+        true[label="True causal slope:\nAverage slope\nof evaporation\nresponse to\ninterventions\non soil moisture"];
+        true_de[label="True causal slope:\nAverage slope\nof evaporation\nresponse to\ninterventions\non soil moisture"];
+        adjusted[label="Adjusted slope:\nAverage slope\nadjusting\nfor confouding"];
+
+        class -> realistic;
+        class -> deconfounded;
+
+        realistic -> true;
+        realistic -> naive;
+        realistic -> adjusted;
+
+        deconfounded -> true_de;
+        deconfounded -> naive_de;
+
+}

@@ -2,10 +2,10 @@ digraph G {
 
         climate[label="climate\n& interannual\nvariability"];
         season[label="season"];
-        LAI[label="LAI (t=0)", style="filled"];
-        sm[label="SM(t=0)", shape="invhouse"];
+        LAI[label="LAI\n(t=0)", style="filled"];
+        sm[label="soil\nmoisture\n(t=0)", shape="invhouse"];
 	et[label="evaporation(t>0)", shape="house"];
-        groundTemperature[label="ground\ntemperature(t=0)", style="filled"];
+        groundTemperature[label="ground\ntemperature\n(t=0)", style="filled"];
         temperature[label="temperature\n(t=0)", style="filled"];
         humidity[label="humidity\n(t=0)", style="filled"];
         cloud[label="clouds\n(t=0)", style="filled"];

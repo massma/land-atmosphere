@@ -567,37 +567,15 @@ for site in stations.keys():
 for (site, experiments) in SITES.items():
     print('\n****%s****' % site)
     _df = experiments['realistic']
-    (pearson,p_pearson) = scipy.stats.pearsonr(_df.SM, _df.ET)
-    (kendall,p_kendall) = scipy.stats.kendalltau(_df.SM, _df.ET)
-    (spearman,p_spearman) = scipy.stats.spearmanr(_df.SM, _df.ET)
-    print('Difference betwee kendal (nonlinear) and pearson (linaer) for reality: %f'
-          % (kendall-pearson))
-    print('Difference betwee kendal (nonlinear) and pearson (linaer) for reality : %f'
-          % (spearman-pearson))
-    print('Difference betwee kendal (nonlinear) and pearson (linaer) for reality: %f'
-          % (p_pearson-p_kendall))
-    print('Difference betwee kendal (nonlinear) and pearson (linaer) for reality : %f'
-          % (p_pearson-p_spearman))
-    _df = experiments['deconfounded']
-    (de_pearson, de_p_pearson) = scipy.stats.pearsonr(_df.SM, _df.ET)
-    (de_kendall, de_p_kendall) = scipy.stats.kendalltau(_df.SM, _df.ET)
-    (de_spearman, de_p_spearman) = scipy.stats.spearmanr(_df.SM, _df.ET)
-    print('Difference betwee kendal (nonlinear) and pearson (linaer) for deconfounded: %f'
-          % (de_kendall-de_pearson))
-    print('Difference betwee kendal (nonlinear) and pearson (linaer) for deconfounded : %f'
-          % (de_spearman-de_pearson))
-    print('Difference betwee kendal (nonlinear) and pearson (linaer) for deconfounded: %f'
-          % (de_p_pearson-de_p_kendall))
-    print('Difference betwee spearman (nonlinear) and pearson (linaer) for deconfounded : %f'
-          % (de_p_pearson-de_p_spearman))
-    print('Kendall non-linearity (higher is more nonlinear): %f'
-          % ((de_kendall-de_pearson)-(kendall-pearson)))
-    print('Spearman non-linearity (higher is more nonlinear): %f'
-          % ((de_spearman-de_pearson)-(spearman-pearson)))
-    print('Kendall non-linearity probability (higher is more nonlinear): %f'
-          % ((de_p_pearson-de_p_kendall)-(p_pearson-p_kendall)))
-    print('Spearman non-linearity probability (higher is more nonlinear): %f'
-          % ((de_p_pearson-de_p_spearman)-(p_pearson-p_spearman)))
+    _df['vpd'] = e_s(_df['theta']) - e_from_q(_df['q']/1000, _df['pressure']*100)
+    (spearman,p_spearman) = scipy.stats.spearmanr(_df.SM, _df['cc'])
+    print('Spearman r for SM-cloud: %f' % (spearman))
+    (spearman,p_spearman) = scipy.stats.spearmanr(_df.SM, _df['vpd'])
+    print('Spearman r for SM-vpd: %f' % (spearman))
+    (spearman,p_spearman) = scipy.stats.spearmanr(_df['cc'], _df['ET'])
+    print('Spearman r for cloud-ET: %f' % (spearman))
+    (spearman,p_spearman) = scipy.stats.spearmanr(_df['vpd'], _df['ET'])
+    print('Spearman r for vpd-ET: %f' % (spearman))
     scatter_plot(experiments, site)
 
 def fraction_wilt(site):
@@ -787,7 +765,7 @@ df = concat_experiment('realistic')
 # rea
 # prep
 fig = plt.figure()
-fig.set_figheight(fig.get_figheight()*3.0)
+fig.set_figheight(fig.get_figheight()*2.5)
 fig.set_figwidth(fig.get_figwidth()*1.5)
 ax1 = fig.add_subplot(311)
 averages = np.array([SITES[site]['realistic'].slope.mean()
@@ -823,11 +801,11 @@ ax2.errorbar(xs, de_averages, yerr=np.stack([de_averages - de_lows,
                                              de_highs - de_averages]),
              fmt='*', label='Truth')
 ax2.plot(xs, de_naives, '*', label='Naive')
-ax2.set_title('De-Confounded World')
+ax2.set_title('Deconfounded World')
 ax2.set_xticks(xs)
 # ax2.set_xticklabels(['' for x in xs])
 ax2.set_xticklabels(SITE_LABELS)
-ax2.legend()
+ax2.legend(loc=2)
 # error
 ax3 = fig.add_subplot(313)
 def error_f(estimate, low, high):
@@ -888,7 +866,7 @@ plt.savefig('figs/reality-adjustment-comparison.pdf')
 
 
 fig = plt.figure()
-fig.set_figheight(fig.get_figheight()*2.0)
+fig.set_figheight(fig.get_figheight()*1.5)
 df = SITES['flagstaff']['realistic']
 ds = df.loc[(1998, 242)].iloc[0]
 ax = fig.add_subplot(211)
@@ -917,7 +895,7 @@ ax.set_xlabel('Soil Moisture (Volumetric Fraction)')
 ax.legend()
 
 plt.savefig('figs/true-fit.pdf')
-plt.show()
+# plt.show()
 
 # final_site_comparison_figures()
 plt.close('all')
