@@ -43,8 +43,8 @@ RANDOM_STATE = np.random.RandomState(0)
 SITE_ORDER = ['bergen', 'idar_oberstein', 'lindenberg', 'milano', 'kelowna',  'quad_city',
               'spokane', 'flagstaff', 'elko', 'las_vegas', 'riverton', 'great_falls' ]
 
-SITE_LABELS = ['Bergen', 'Idar\nOberstein', 'Lindenberg', 'Milano', 'Kelowna',  'Quad\nCity',
-              'Spokane', 'Flagstaff', 'Elko', 'Las\nVegas', 'Riverton', 'Great\nFalls' ]
+SITE_LABELS = ['Bergen', 'Idar\nOberstein', 'Linden-\nberg', 'Milano', 'Kelowna',  'Quad\nCity',
+              'Spokane', 'Flag-\nstaff', 'Elko', 'Las\nVegas', 'Riverton', 'Great\nFalls' ]
 
 SITE_TITLE = dict(zip(SITE_ORDER, SITE_LABELS))
 EXPERIMENT_NAMES = ['deconfounded', 'realistic']
@@ -306,13 +306,13 @@ with regression fits overlaid"""
     model = naive_regression(_df)
     add_linear_regression(model, ax1, '')
     ax1.set_title('Deconfounded World (%s)' % SITE_TITLE[site].replace('\n', ' '))
-    ax1.set_ylabel('Evaporation (W/m2)')
+    ax1.set_ylabel('Evaporation (W m$^{-2}$)')
     ax1.set_xlabel('')
     deconfounded_residuals = _df.ET - np.squeeze(model.predict(prep_x_data(_df.SM)))
     ax3 = fig.add_subplot(223)
     ax3 = sns.scatterplot(x=_df.SM, y=deconfounded_residuals, ax=ax3)
     ax3.set_xlabel("Soil Moisture (volumetric fraction)")
-    ax3.set_ylabel('Evaporation Residuals (W/m2)')
+    ax3.set_ylabel('Evaporation Residuals (W m$^{-2}$)')
     ax2 = fig.add_subplot(222)
     _df = experiments['realistic']
     ax2 = sns.scatterplot(data=_df,
@@ -565,17 +565,6 @@ for site in stations.keys():
         print("%s, %s size: %d" % (site, exp, SITES[site][exp].shape[0]))
 
 for (site, experiments) in SITES.items():
-    print('\n****%s****' % site)
-    _df = experiments['realistic']
-    _df['vpd'] = e_s(_df['theta']) - e_from_q(_df['q']/1000, _df['pressure']*100)
-    (spearman,p_spearman) = scipy.stats.spearmanr(_df.SM, _df['cc'])
-    print('Spearman r for SM-cloud: %f' % (spearman))
-    (spearman,p_spearman) = scipy.stats.spearmanr(_df.SM, _df['vpd'])
-    print('Spearman r for SM-vpd: %f' % (spearman))
-    (spearman,p_spearman) = scipy.stats.spearmanr(_df['cc'], _df['ET'])
-    print('Spearman r for cloud-ET: %f' % (spearman))
-    (spearman,p_spearman) = scipy.stats.spearmanr(_df['vpd'], _df['ET'])
-    print('Spearman r for vpd-ET: %f' % (spearman))
     scatter_plot(experiments, site)
 
 def fraction_wilt(site):
@@ -717,47 +706,6 @@ def confounding_error(site):
           np.absolute(SITES[site]['deconfounded']['naive_error'])
     return err
 
-def final_site_comparison_figures():
-    """Make a subset of final sites comparison plots. THese should be publication ready.
-
-Currently, this subset is: (we really probably just wantt thist o be
-SM in the end, and part of the other panel fig with slope estiamtes
-and error
-
-SM (w/wfc, and wwilt) (wsat is just used fo rheat transfer)
-et
-slope
-lai
-theta
-rh
-cc
-
-    """
-    df = concat_experiment('realistic')
-    df['rh'] = rh_from_t_a_q_p(df['theta'],
-                               df['q'] / 1000.0,
-                               df['pressure']*100.0)
-    df['climate'] = [SITE_CLIMATES[site] for site in df.site]
-    fig = plt.figure()
-    ax = fig.subplots(nrows=1, ncols=1)
-    ax = sns.boxplot(x='site', y='SM', data=df, order=SITE_ORDER, ax=ax,
-                     hue='climate', dodge=False)
-    ax = sns.stripplot(x='site', y='wwilt', data=SITE_CONSTANTS,
-                       ax=ax, order=SITE_ORDER, color='k')
-    ax = sns.stripplot(x='site', y='wfc', data=SITE_CONSTANTS,
-                       ax=ax, order=SITE_ORDER, color='m')
-    ax.set_title('SM')
-    ax.legend([], [], frameon=False)
-
-    for key in ['ET', 'slope', 'LAI', 'theta', 'rh', 'cc']:
-        fig = plt.figure()
-        ax = fig.subplots(nrows=1, ncols=1)
-        ax = sns.boxplot(x='site', y=key, data=df, order=SITE_ORDER, ax=ax,
-                         hue='climate', dodge=False)
-        ax.set_title(key)
-        ax.legend([], [], frameon=False)
-    return True
-
 df = concat_experiment('realistic')
 
 
@@ -765,9 +713,9 @@ df = concat_experiment('realistic')
 # rea
 # prep
 fig = plt.figure()
-fig.set_figheight(fig.get_figheight()*2.5)
+# fig.set_figheight(fig.get_figheight()*2.5)
 fig.set_figwidth(fig.get_figwidth()*1.5)
-ax1 = fig.add_subplot(311)
+ax1 = fig.add_subplot(111)
 averages = np.array([SITES[site]['realistic'].slope.mean()
             for site in SITE_ORDER])
 lows = np.array([SITES[site]['realistic'].min_slope.mean()
@@ -786,28 +734,31 @@ de_naives = np.array([float(naive_regression(SITES[site]['deconfounded']).coef_)
                       for site in SITE_ORDER])
 xs = np.array([x for (site, x) in zip(SITE_ORDER, range(0, 100))])
 # reality
-ax1.errorbar(xs, averages, yerr=np.stack([averages - lows,
+delta = 0.13
+offset = 0.5*delta
+markersize=7
+linewidth=3
+ax1.errorbar(xs-delta, averages, yerr=np.stack([averages - lows,
                                                 highs - averages]),
-             fmt='o', label='Truth')
-ax1.plot(xs, naives, 'o', label='Naive')
+             fmt='o', label='Truth (Realistic World)', markersize=markersize, linewidth=linewidth)
+ax1.plot(xs-delta+offset, naives, 'o', label='Naive (Realistic World)', markersize=markersize, linewidth=linewidth)
+ax1.errorbar(xs+delta, de_averages, yerr=np.stack([de_averages - de_lows,
+                                                   de_highs - de_averages]),
+             fmt='*', label='Truth (Deconfounded World)', markersize=markersize, linewidth=linewidth)
+ax1.plot(xs+delta-offset, de_naives, '*', label='Naive (Deconfounded World)', markersize=markersize, linewidth=linewidth)
 ax1.set_xticks(xs)
 # ax1.set_xticklabels(['' for x in xs])
 ax1.set_xticklabels(SITE_LABELS)
-ax1.set_title('Realistic World')
 ax1.legend(loc=2)
-# deconfounded world
-ax2 = fig.add_subplot(312)
-ax2.errorbar(xs, de_averages, yerr=np.stack([de_averages - de_lows,
-                                             de_highs - de_averages]),
-             fmt='*', label='Truth')
-ax2.plot(xs, de_naives, '*', label='Naive')
-ax2.set_title('Deconfounded World')
-ax2.set_xticks(xs)
-# ax2.set_xticklabels(['' for x in xs])
-ax2.set_xticklabels(SITE_LABELS)
-ax2.legend(loc=2)
-# error
-ax3 = fig.add_subplot(313)
+slope_string = r'$\frac{\partial E}{\partial SM}$ (W m$^{-2})$'
+ax1.set_ylabel(slope_string)
+plt.tight_layout()
+plt.savefig('figs/reality-deconfounded-comparison.pdf')
+
+
+# reality decofounded figure
+# rea
+# prep
 def error_f(estimate, low, high):
     """returns error vien of ESTIMATE fiven LOW and HIGH bounds"""
     if (estimate < low):
@@ -817,21 +768,15 @@ def error_f(estimate, low, high):
     else:
         return 0.0
 v_error_f = np.vectorize(error_f, otypes=[np.dtype('float64')])
-ax3.plot(xs, v_error_f(naives, lows, highs), 'ko',
-         label="realistic world\n(specification + confounding error)")
-ax3.plot(xs, v_error_f(de_naives, de_lows, de_highs), 'm*',
-         label="deconfounded world\n(specification error)")
-ax3.set_xticks(xs)
-ax3.set_xticklabels(SITE_LABELS)
-ax3.legend()
-ax3.set_title('Naive Regression Error')
-plt.tight_layout()
-plt.savefig('figs/reality-deconfounded-comparison.pdf')
-
-
-# reality decofounded figure
-# rea
-# prep
+def error_f(estimate, low, high):
+    """returns error vien of ESTIMATE fiven LOW and HIGH bounds"""
+    if (estimate < low):
+        return low - estimate
+    elif (estimate > high):
+        return estimate - high
+    else:
+        return 0.0
+v_error_f = np.vectorize(error_f, otypes=[np.dtype('float64')])
 fig = plt.figure()
 fig.set_figheight(fig.get_figheight()*2.0)
 fig.set_figwidth(fig.get_figwidth()*1.5)
@@ -842,25 +787,28 @@ xs = np.array([x for (site, x) in zip(SITE_ORDER, range(0, 100))])
 # reality
 ax1.errorbar(xs, averages, yerr=np.stack([averages - lows,
                                           highs - averages]),
-             fmt='o', label='Truth')
-ax1.plot(xs, naives, 'o', label='Naive')
-ax1.plot(xs, adjusted, '*', label='Adjusted')
+             fmt='o', label='Truth',
+             markersize=markersize, linewidth=linewidth)
+ax1.plot(xs-offset, naives, 'o', label='Naive', markersize=markersize, linewidth=linewidth)
+ax1.plot(xs+offset, adjusted, '*', label='Adjusted', markersize=markersize, linewidth=linewidth)
 ax1.set_xticks(xs)
 ax1.set_xticklabels(SITE_LABELS)
-ax1.set_ylabel('Slope term (W m$^{-2})$')
+ax1.set_ylabel(slope_string)
 ax1.set_title('Adjustment in the Realistic World')
 ax1.legend(loc=2)
 # error
 ax2 = fig.add_subplot(212)
 ax2.plot(xs, v_error_f(naives, lows, highs), 'ko',
-         label="Naive")
+         label="Naive",
+         markersize=markersize, linewidth=linewidth)
 ax2.plot(xs, v_error_f(adjusted, lows, highs), 'm*',
-         label="Adjusted")
+         label="Adjusted",
+         markersize=markersize, linewidth=linewidth)
 ax2.set_xticks(xs)
 ax2.set_xticklabels(SITE_LABELS)
-ax2.set_ylabel('Mean Absolute Error (W m$^{-2}$)')
+ax2.set_ylabel(r'Mean Absolute Error of ' + slope_string)
 ax2.legend()
-ax2.set_title('Errors')
+ax2.set_title('Adjustment and Naive Errors')
 plt.tight_layout()
 plt.savefig('figs/reality-adjustment-comparison.pdf')
 
@@ -900,3 +848,73 @@ plt.savefig('figs/true-fit.pdf')
 # final_site_comparison_figures()
 plt.close('all')
 # plt.show()
+
+# todo: make plot fo sm, rh, and cc?; also, this can be done with just
+# amtplotlib, and give better control over whiskers, etc.
+fig = plt.figure()
+
+df = concat_experiment('realistic')
+df['climate'] = [SITE_CLIMATES[site] for site in df.site]
+def rh_from_df(_df):
+    return rh_from_t_a_q_p(_df['theta'].values,
+                           _df['q'].values / 1000.0,
+                           _df['pressure'].values * 100.0)
+
+df['vpd'] = e_s(df['theta']) - e_from_q(df['q']/1000, df['pressure']*100)
+
+fig = plt.figure()
+fig.set_figheight(fig.get_figheight()*2.0)
+fig.set_figwidth(fig.get_figwidth()*1.5)
+xs = np.arange(1, 13)
+ax = fig.add_subplot(311)
+sms = [SITES[site]['realistic']['SM'].values
+       for site in SITE_ORDER]
+wilts = [SITE_CONSTANTS.loc[site, 'wwilt']
+         for site in SITE_ORDER]
+wfcs = [SITE_CONSTANTS.loc[site, 'wfc']
+         for site in SITE_ORDER]
+ax.boxplot(sms)
+ax.errorbar(xs, wilts, xerr=0.2, fmt='none', label='wilting point', elinewidth=linewidth)
+ax.errorbar(xs, wfcs, xerr=0.2, fmt='none', label='field capacity', elinewidth=linewidth)
+# ax.set_xticklabels(SITE_LABELS)
+ax.set_xticklabels(['' for _ in SITE_LABELS])
+ax.set_ylabel('Soil Moisture (Volumetric Fraction)')
+ax.set_title('CLASS4GL Observations Across Sites')
+ax.legend()
+# ax.set_ylim([0.0, ax.get_ylim()[1]])
+
+ax = fig.add_subplot(312)
+rhs = [rh_from_df(SITES[site]['realistic'])
+       for site in SITE_ORDER]
+ax.boxplot(rhs)
+# ax.set_xticklabels(SITE_LABELS)
+ax.set_xticklabels(['' for _ in SITE_LABELS])
+ax.set_ylabel('Relative Humidity')
+
+ax = fig.add_subplot(313)
+ccs = [SITES[site]['realistic'].cc.values
+       for site in SITE_ORDER]
+ax.boxplot(ccs)
+ax.set_xticklabels(SITE_LABELS)
+ax.set_ylabel('Cloud Cover (fraction)')
+plt.tight_layout()
+plt.savefig('figs/site-climmate.pdf')
+plt.show()
+
+ax = sns.boxplot(x='site', y='SM', data=df, order=SITE_ORDER, ax=ax,
+                 hue='climate', dodge=False)
+ax = sns.stripplot(x='site', y='wwilt', data=SITE_CONSTANTS,
+                   ax=ax, order=SITE_ORDER, color='k')
+ax = sns.stripplot(x='site', y='wfc', data=SITE_CONSTANTS,
+                   ax=ax, order=SITE_ORDER, color='m')
+ax.set_title('SM')
+ax.legend([], [], frameon=False)
+
+for key in ['ET', 'slope', 'LAI', 'theta', 'rh', 'cc', 'vpd']:
+    fig = plt.figure()
+    ax = fig.subplots(nrows=1, ncols=1)
+    ax = sns.boxplot(x='site', y=key, data=df, order=SITE_ORDER, ax=ax,
+                     hue='climate', dodge=False)
+    ax.set_title(key)
+    ax.legend([], [], frameon=False)
+plt.show()
