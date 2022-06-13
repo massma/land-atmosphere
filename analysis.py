@@ -845,22 +845,12 @@ ax.legend()
 plt.savefig('figs/true-fit.pdf')
 # plt.show()
 
-# final_site_comparison_figures()
-plt.close('all')
-# plt.show()
-
-# todo: make plot fo sm, rh, and cc?; also, this can be done with just
-# amtplotlib, and give better control over whiskers, etc.
-fig = plt.figure()
-
-df = concat_experiment('realistic')
-df['climate'] = [SITE_CLIMATES[site] for site in df.site]
+
+# plot of site characteristics
 def rh_from_df(_df):
     return rh_from_t_a_q_p(_df['theta'].values,
                            _df['q'].values / 1000.0,
                            _df['pressure'].values * 100.0)
-
-df['vpd'] = e_s(df['theta']) - e_from_q(df['q']/1000, df['pressure']*100)
 
 fig = plt.figure()
 fig.set_figheight(fig.get_figheight()*2.0)
@@ -873,12 +863,12 @@ wilts = [SITE_CONSTANTS.loc[site, 'wwilt']
          for site in SITE_ORDER]
 wfcs = [SITE_CONSTANTS.loc[site, 'wfc']
          for site in SITE_ORDER]
-ax.boxplot(sms)
+ax.violinplot(sms)
 ax.errorbar(xs, wilts, xerr=0.2, fmt='none', label='wilting point', elinewidth=linewidth)
 ax.errorbar(xs, wfcs, xerr=0.2, fmt='none', label='field capacity', elinewidth=linewidth)
 # ax.set_xticklabels(SITE_LABELS)
 ax.set_xticklabels(['' for _ in SITE_LABELS])
-ax.set_ylabel('Soil Moisture (Volumetric Fraction)')
+ax.set_ylabel('Soil Moisture (volumetric fraction)')
 ax.set_title('CLASS4GL Observations Across Sites')
 ax.legend()
 # ax.set_ylim([0.0, ax.get_ylim()[1]])
@@ -886,35 +876,20 @@ ax.legend()
 ax = fig.add_subplot(312)
 rhs = [rh_from_df(SITES[site]['realistic'])
        for site in SITE_ORDER]
-ax.boxplot(rhs)
+ax.violinplot(rhs)
 # ax.set_xticklabels(SITE_LABELS)
 ax.set_xticklabels(['' for _ in SITE_LABELS])
-ax.set_ylabel('Relative Humidity')
+ax.set_ylabel('Relative Humidity (fraction)')
 
 ax = fig.add_subplot(313)
 ccs = [SITES[site]['realistic'].cc.values
        for site in SITE_ORDER]
-ax.boxplot(ccs)
+ax.violinplot(ccs)
+ax.set_xticks(xs)
 ax.set_xticklabels(SITE_LABELS)
 ax.set_ylabel('Cloud Cover (fraction)')
 plt.tight_layout()
-plt.savefig('figs/site-climmate.pdf')
-plt.show()
+plt.savefig('figs/site-climate.pdf')
 
-ax = sns.boxplot(x='site', y='SM', data=df, order=SITE_ORDER, ax=ax,
-                 hue='climate', dodge=False)
-ax = sns.stripplot(x='site', y='wwilt', data=SITE_CONSTANTS,
-                   ax=ax, order=SITE_ORDER, color='k')
-ax = sns.stripplot(x='site', y='wfc', data=SITE_CONSTANTS,
-                   ax=ax, order=SITE_ORDER, color='m')
-ax.set_title('SM')
-ax.legend([], [], frameon=False)
-
-for key in ['ET', 'slope', 'LAI', 'theta', 'rh', 'cc', 'vpd']:
-    fig = plt.figure()
-    ax = fig.subplots(nrows=1, ncols=1)
-    ax = sns.boxplot(x='site', y=key, data=df, order=SITE_ORDER, ax=ax,
-                     hue='climate', dodge=False)
-    ax.set_title(key)
-    ax.legend([], [], frameon=False)
-plt.show()
+plt.close('all')
+# plt.show()
