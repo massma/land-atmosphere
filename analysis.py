@@ -893,3 +893,64 @@ plt.savefig('figs/site-climate.pdf')
 
 plt.close('all')
 # plt.show()
+
+
+# reality adjusted figure for presentation
+offset = 0.15
+markersize=10
+linewidth=3
+fig = plt.figure()
+fig.set_figheight(fig.get_figheight()*2.0)
+fig.set_figwidth(fig.get_figwidth()*1.5)
+ax1 = fig.add_subplot(211)
+adjusted = np.array([SITES[site]['realistic'].neighbor_slope.mean()
+                     for site in SITE_ORDER])
+xs = np.array([x for (site, x) in zip(SITE_ORDER, range(0, 100))])
+# reality
+ax1.errorbar(xs, averages, yerr=np.stack([averages - lows,
+                                          highs - averages]),
+             fmt='o', label='True Interventional',
+             markersize=markersize, linewidth=linewidth)
+ax1.plot(xs-offset, naives, 'o', label='Correlation', markersize=markersize, linewidth=linewidth)
+ax1.plot(xs+offset, adjusted, '*', label='Statistically Adjusted', markersize=markersize, linewidth=linewidth)
+ax1.set_xticks(xs)
+ax1.set_xticklabels(SITE_LABELS)
+ax1.set_ylabel(slope_string)
+ax1.set_title('Statistical Adjustment')
+ax1.legend(loc=2)
+# error
+ax2 = fig.add_subplot(212)
+ax2.plot(xs, v_error_f(naives, lows, highs), 'ko',
+         label="Correlation",
+         markersize=markersize, linewidth=linewidth)
+ax2.plot(xs, v_error_f(adjusted, lows, highs), 'm*',
+         label="Statistically Adjusted",
+         markersize=markersize, linewidth=linewidth)
+ax2.set_xticks(xs)
+ax2.set_xticklabels(SITE_LABELS)
+ax2.set_ylabel(r'Mean Absolute Error of ' + slope_string)
+ax2.legend()
+ax2.set_title('Statistical Adjustment and Correlation Errors')
+plt.tight_layout()
+plt.savefig('figs/reality-adjustment-comparison-presentation.png')
+
+
+# reality decofounded figure for presentation
+# rea
+# prep
+fig = plt.figure()
+# fig.set_figheight(fig.get_figheight()*2.5)
+fig.set_figwidth(fig.get_figwidth()*1.5)
+ax1 = fig.add_subplot(111)
+ax1.errorbar(xs-delta, averages, yerr=np.stack([averages - lows,
+                                                highs - averages]),
+             fmt='o', label='True Interventional', markersize=markersize, linewidth=linewidth)
+ax1.plot(xs-delta+offset, naives, 'o', label='Correlation', markersize=markersize, linewidth=linewidth)
+ax1.set_xticks(xs)
+# ax1.set_xticklabels(['' for x in xs])
+ax1.set_xticklabels(SITE_LABELS)
+ax1.legend(loc=2)
+slope_string = r'$\frac{\partial E}{\partial SM}$ (W m$^{-2})$'
+ax1.set_ylabel(slope_string)
+plt.tight_layout()
+plt.savefig('figs/reality-deconfounded-comparison-presentation.png')
