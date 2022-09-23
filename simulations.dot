@@ -7,7 +7,7 @@ digraph G {
         naive_de[label="Naive causal slope:\nLinear\nregression of\nevaporation on\nsoil moisture"];
         true[label="True causal slope:\nAverage slope\nof evaporation\nresponse to\ninterventions\non soil moisture"];
         true_de[label="True causal slope:\nAverage slope\nof evaporation\nresponse to\ninterventions\non soil moisture"];
-        adjusted[label="Adjusted slope:\nAverage slope\nadjusting\nfor confouding"];
+        adjusted[label="Estimated causal slope:\nAverage slope\nadjusting\nfor confouding"];
 
         class -> realistic;
         class -> deconfounded;
