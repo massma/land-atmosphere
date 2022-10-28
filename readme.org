@@ -1,4 +1,11 @@
-* Investigating land atmosphere interactions (and potentially causality) with MXLCH
+* Estimating the ecosystem evaporation response to interventions on soil moisture: confounding and causal modeling in a simulated world
+
+** To-Do
+   - [ ] fix all latex compilation errors
+   - [ ] setup appendex
+   - [ ] rewrite intro as a standalone article
+   - [ ] write abstract
+
 ** Requirements
 
 *** Reqirements (with Debian 11 Bullseye package name(s) in parenthesis)
