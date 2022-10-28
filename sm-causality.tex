@@ -1,0 +1,912 @@
+\chapter{Estimating the ecosystem evaporation response to
+  interventions on soil moisture: confounding and causal modeling in a
+simulated world}
+\label{cha:calc-resp-ecosyst}
+\section{Introduction}
+
+In Chapter \ref{cha:when-does-vapor} we developed theory for the
+evaporation response to changes in atmospheric aridity, and we
+encountered qualitative differences in current plant models'
+representation of the ecosystem response. This divergence in plant
+models' behavior is a reflection of the challenges of modeling such
+complex systems with necessarily simple models with relatively few
+parameters. However, it also motivates the exploration of other
+methods of developing plant models and estimating plant response to
+interventions on environmental conditions.
+
+One alternative method for developing plant models is to more strongly
+guide their response with observational data from the real world. We
+know such data are representative of ecosystems' full complexity and
+relationship with the environment, so perhaps we can use those data to
+develop models or computational methods that are faithful to
+ecosystems' real world behavior. In order to replace more traditional
+theoretical models, any models derived from data must estimate the
+response to interventions on initial and/or boundary conditions,
+rather than just observed correlations between responses and
+initial/boundary conditions. This distinction and need for models
+based on interventions rather than correlations is crucial: as we saw
+in Chapter \ref{cha:caus-infer-proc}, naive correlation-based
+relationships between two variables can be attributable to other
+processes entirely; for example, a correlation relationship between
+soil moisture and evaporation could be partially attributable to
+synoptic-induced co-variations between soil moisture, vapor pressure
+deficit, cloudiness, etc., all of which affect evaporation. If we used
+such a correlation-based relationship in a numerical experiment on
+soil moisture, or alternatively within a larger model that supplies a
+soil moisture boundary condition, then the calculated response of
+evaporation would be biased. However, if we are able to use data to
+isolate the interventional and causal relationship between soil
+moisture and evaporation, then we can use such an interventional
+relationship within numerical experiments and larger system-based
+models without a risk of confounding bias (see Chapter
+\ref{cha:caus-infer-proc} for more on confounding bias). Developing
+methods to extract interventional relationships from passive
+(i.e. non-experimental) observations is the primary goal of this
+chapter.
+
+This data-driven approach and the need to calculate the response to
+interventions introduces challenges: as we saw in Chapter
+\ref{cha:caus-infer-proc}, differentiating causal
+(i.e. interventional) relationships from mere correlations requires
+controlling for sources of confounding\cite{pearl2009}, which can be
+difficult particularly in a system with feedbacks and an underlying
+climate state that drives co-variations in many of the processes of
+interest. Given these potential challenges, an intermediate step
+before calculating a causal effect with real world data is to estimate
+a causal effect from passively observed data in a simulated reality
+where we know the true response to interventions. If our estimated
+causal effects match the simulation's true response to interventions,
+and the simulated reality shares many of the characteristics that make
+causal inference challenging in the real world, then we have
+confidence about our method's potential success in the real world.
+
+However, if we had access to a simulation that reproduces reality,
+then we would have no need to estimate causal relationships from data.
+Unfortunately any simulation will deviate from reality. However, we do
+not need a simulator that matches reality; we just need a simulator
+with a reasonable amount of realism, and a simulator that shares the
+same methodological challenges to causal inference and estimation, for
+example feedbacks, non-linearity, and perhaps most importantly,
+co-variations in the initial and boundary conditions due to the
+underlying climate and land surface state (for example: soil moisture,
+vapor pressure deficit, and cloudiness). We will use a simulator with
+these characteristics to accomplish our two primary goals:
+
+\begin{enumerate}
+  \item Quantify the degree to which confounding shifts the
+    relationship between simulated evaporation and soil moisture, and
+    how confounding varies across site and climate.
+\item Develop methods for calculating a causal effect from data that
+  are tractable and pragmatic in the real world. We will apply causal
+  estimation to simulated data where we know the true response of
+  evaporation to interventions on soil moisture, and assess the
+  reliability of our causal estimates relative to the simulated truth.
+\end{enumerate}
+
+\section{Methods}
+\label{sec:methods-sm-caus}
+
+This research project has two goals: 1) estimate and present the
+impact of confounding on observationally derived relationships between
+soil moisture and ecosystem evaporation, and 2) develop a method for
+calculating causal relationships between interventions on soil
+moisture and ecosystem evaporation, and assess the method's
+performance and biases in a simulated world where we know the true
+effect.
+
+To accomplish both of these goals, we will use the Chemistry
+Land-surface Atmosphere Soil Slab (CLASS) model
+\cite[\url{https://classmodel.github.io/}, ]{de2015atmospheric,},
+which was developed specifically for representing and understanding
+land-atmosphere feedbacks. Furthermore, there is a database of initial
+and boundary conditions for CLASS called CLASS4GL
+\cite[\url{https://class4gl.eu/}]{wouters-class4gl-2019}. CLASS4GL
+assimilates weather balloon, satellite, and reanalysis data to
+generate initial and boundary conditions to the CLASS model that are
+consistent with the observed state at sites around the world. This
+database was also designed specifically to study land atmosphere
+feedbacks, and most importantly for our applications, it will include
+the true observed co-variability between initial conditions. So while
+our simulated reality alters the mapping between initial conditions
+and the outcome of interest (evaporation) relative to the real world,
+the co-variability of initial and boundary conditions matches the
+truth in the real world. Given that the source of confounding between
+soil moisture and evaporation is this climate-driven co-variability of
+initial/boundary conditions, CLASS4GL's representation of this
+climate-driven co-variability improves our confidence that methods
+developed in CLASS's simulated reality may translate to the real
+world.
+
+To summarize, the simulated model (CLASS) is ideally suited to our
+purposes: it is efficient enough to simulate many interventional
+experiments for validation of our causal methods, and it is explicitly
+designed to represent the feedbacks and non-linearity of the
+system. Through CLASS4GL, we also have access to initial and boundary
+conditions that are consistent with observed conditions, and represent
+confounding due to the climate, synoptic, and land surface state.
+
+We use every CLASS4GL site that has at least 500 daily initial and
+boundary conditions, leaving 12 sites. This range of sites spans
+various climates and plant functional types, which allows us to
+understand confounding and our ability to adjust for it in terms of
+climate and ecosystem type.
+
+\subsection{Estimating the impact of confounding on observationally derived relationships between soil moisture and ecosystem evaporation}
+\label{sec:estim-impact-conf}
+
+To estimate the impact of confounding on observationally-derived
+relationships between soil moisture and ecosystem evaporation, we will
+compare ordinary linear least-square regressions from two simulated
+worlds:
+
+\begin{enumerate}
+  \item reality; where soil moisture is confounding by the large scale
+    climate and land surface state. We will call this the
+    ``\textbf{Realistic World}.''
+
+  \item an alternate reality where soil moisture is sampled
+    independently of all other variables, and there is no
+    confounding. We will call this the ``\textbf{Deconfounded
+      World}.''
+\end{enumerate}
+
+\begin{figure}
+  \includegraphics[width=\textwidth]{./sm-causality-figs/simulations.pdf}
+  \caption{A diagram of this analysis's simulated worlds and the
+    statistical models fit to those
+    simulations.}\label{fig:simulations}
+\end{figure}
+
+For each world, we simulate the daily evolution of the boundary layer
+for each set of daily initial and boundary conditions in the CLASS4GL
+database. The only difference between the Realistic World and the
+Deconfounded World is that in the Deconfounded World we use a soil
+moisture initial condition that is randomly sampled independently from
+the model's other initial and boundary conditions (Figure
+\ref{fig:simulations}).
+
+We can estimate the true causal effect for each world and each day by
+varying the initial condition of soil moisture by $\pm0.01$. Our
+outcome of interest is average evaporation from 1300 local time to
+1700 local time. We can then use these outcomes from our local
+interventions on soil moisture ($E(SM-0.01), E(SM), E(SM+0.01)$, where
+$E$ is the average evaporation and $SM$ is initial soil moisture) to
+numerically estimate the slope of the evaporation response to soil
+moisture ($\frac{\partial E}{\partial SM}$) for each day. However,
+occasionally non-linearity in the simulation leads to sets of three
+points that are not in an approximately straight line, and it is not
+clear what a single value of the ``true'' slope should be (Figure
+\ref{fig:true-fit}). We represent this ambiguity by using three
+different numerical methods to calculate the slope: the forward
+difference method ($\frac{\partial E}{\partial SM} = \frac{E(SM+0.01)
+  - E(SM)}{0.01}$), the backward difference method ($\frac{\partial
+  E}{\partial SM} = \frac{E(SM) - E(SM-0.01)}{0.01}$), and the
+centered difference method ($\frac{\partial E}{\partial SM} =
+\frac{E(SM+0.01) - E(SM-0.01)}{0.02}$). We interpret these three
+estimates as three possible values of the slope $E(SM)$ with respect
+to $SM$, and we can use these three possible values to bound our
+statistics. For example, we will compare data-driven causal estimates
+of the average evaporation response to soil moisture to averages of
+our ``true'' slope. We calculate the range of expectation of the true
+slope by taking the average of the minimum of the forward- and
+backward- difference estimates of the slope for each day, and the
+average of the maximum of the forward- and backward- difference
+estimates of the slope for each day. In this way, we can represent the
+range of possible expectations of our ``true'' slope with the averages
+of the minimums and maximums of the slopes at each day.
+
+\begin{figure}
+  \includegraphics[]{./sm-causality-figs/true-fit.pdf}
+  \caption{Estimates of the ``True'' causal response of evaporation to
+    soil moisture by varying soil moisture by $\pm0.01$ with all other
+    initial and boundary conditions held fixed. For most days, like
+    Julian day 242 of year 1998, the response is approximately linear
+    and there is a well defined slope (top panel). However, for some
+    days, like Julian day 256 of year 1998 (bottom panel), the three
+    points are visibly non-linear. Because of this ambiguity, we
+    calculate the slope three ways: using the centered difference,
+    forward difference, and backward difference.}\label{fig:true-fit}
+\end{figure}
+
+We will compare the expectation of the ``true'' response to soil
+moisture, to a naive approach of calculating the evaporation response
+of soil moisture, where we just take the linear least squares
+regression of daily average evaporation between 1300 and 1700 local
+time onto soil moisture's initial condition. In the Realistic World,
+the bias between the naive regression approach and the ``true''
+response to soil moisture includes model specification bias (for
+example, using a linear least squares regression for a non-linear
+process) and confounding bias (for example, co-variations in soil
+moisture and evaporation that are due to the underlying climate
+instead of the causal effect of soil moisture on evaporation).
+
+We can compare the naive approach's bias in the Realistic World to
+bias of the same naive regression approach in the Deconfounded
+World. In the Deconfounded World, there is no systematic confounding
+error because soil moisture is sampled independently from the other
+initial and boundary conditions of the model, so in the Deconfounded
+World the bias of the naive approach is attributable to model
+specification bias. In order to understand the magnitude of
+confounding bias, and how it varies by site, we will compare the error
+of the naive approach in the Realistic World (model specification +
+confounding error) to the error of the naive approach in the
+Deconfounded World (only model specification error).
+
+We use a linear model because of its interpretability, simplicity, and
+freedom from hyper-parameters that could be more or less suited to one
+of the two simulated worlds. We also use a linear model because it
+represents in some ways a ``worst case'' of model specification error
+for a nonlinear process like evaporation. Comparing the confounding
+bias to model specification bias in an extremely naive and simple
+linear model should help contextualize the magnitude of confounding
+bias: due to their ubiquitous use, linear models' errors are
+relatively well understood for these processes, so a comparison
+relative to these errors should be instructive. It is also the case
+that no model specification will fit exactly the same in both the
+Deconfounded and Realistic Worlds, but because of physical science's
+history with using linear models and assessing their
+fit\cite{shalizi2013}, at least we have some well established
+procedures and intuition for assessing the degree to which linear
+models fit the data (for example, examining patterns in residuals to
+assess the degree to which they violate the assumptions of ordinary
+least squares linear regression).
+
+\subsection{Adjust for confounding: a simple approach and its errors}
+\label{sec:attempt-meth-adjust}
+
+To adjust for confounding, we fit a simple, interpretable statistical
+model to simulated data from the Realistic World, and compare the
+statistical model's performance to the estimation of the ``true''
+causal effect.
+
+To account for the sources of confounding, we do a nearest-neighbor
+search for nearby points, where nearness is defined as the euclidean
+distance of normalized data for soil moisture and all of the
+confounders (leaf area index, ground temperature, air temperature,
+humidity, cloud cover, wind-speed, boundary layer height [measure of
+  wind and stability], day of year [driver of the top of the
+  atmosphere incoming radiation], Figure \ref{fig:graph}).  For each
+day, we take the k-nearest neighbors, and for those neighbors we
+regress evaporation onto soil moisture to estimate the local (to that
+day) response of evaporation to soil moisture. Because of this linear
+regression approach on the nearest neighbors, we include soil moisture
+in the measure of nearness to account for nonlinearity: soil
+moisture's slope will vary as a function of soil moisture, and
+including soil moisture in the measure of nearness is a pragmatic
+method to allow for that nonlinearity in the model. The number of
+nearest neighbors ($k$) is determined by varying $k$ and selecting the
+$k$ that results in the lowest mean squared error of the regression on
+held out data.
+
+\begin{figure}
+  \includegraphics[width=\textwidth]{./sm-causality-figs/graph.pdf}
+  \caption{A causal graph of the land atmosphere system in the CLASS
+    model. The causal effect of soil moisture on evaporation is
+    confounded by the season and climate state. However, if we control
+    for leaf area index (LAI), temperature, humidity, cloud cover,
+    wind-speed, boundary layer height, and day of year, the causal
+    effect of soil moisture on evaporation is identified. }
+  \label{fig:graph}
+\end{figure}
+
+We use the k-nearest neighbors approach because:
+
+\begin{itemize}
+
+\item it allows for nonlinearities in the confounders.
+\item it bears a conceptual similarity to the adjustment technique of
+  matching \cite{stuart2010matching}, where one searches for samples
+  with the same (or similar) observations of the confounders, and
+  compares the outcome (in this case evaporation) to the cause (in
+  this case soil moisture) \cite{shalizi2013}.
+\item both the nearest neighbor search and the linear regression steps
+  are transparent and interpretable relative to more black box
+  regression techniques.
+\item the algorithm is deterministic, which aides interpretability and
+  saves us from needing to bootstrap random sampling of initial values
+  of parameters.
+\item it relies on only one hyper-parameter, $k$
+\item it allows for local estimates of causal effects (e.g., at a
+  daily timescale) in addition to longer-term averages. However these
+  local estimates of causal effects may be quite noisy, and for this
+  manuscript we focus on analyzing site-level averages of the soil
+  moisture response to aridity.
+\end{itemize}
+
+
+A summary of the steps of the k-nearest neighbors estimation method is
+as follows:
+
+\begin{enumerate}
+\item \textbf{Aggregate and normalize the data}: Aggregate daily
+  initial (dawn) measurements of the confounders (leaf area index,
+  ground temperature, air temperature, humidity, cloud cover,
+  wind-speed, boundary layer height [measure of wind and stability]),
+  initial (dawn) measurements of soil moisture (the cause), and
+  average afternoon evaporation (the effect, averaged from between
+  1300 and 1700 local time). Subtract the mean and normalize each
+  variable by its standard deviation to make the variables more
+  equally weighted in the Euclidean distance metric used to determine
+  the $k$ nearest neighbors, where all of the confounders and soil
+  moisture are the dimensions for the distance.
+  \item \textbf{Determine the hyperparameter $k$}: Select the
+    hyperparameter $k$ that minimizes the squared error on held out
+    data of the local regression, to avoid over-fitting and optimize
+    the predictive power of our regression. For each $k$ in $\{5, 10,
+    20, 30, 40, 50, 60, 70, 80, 90, 100\}$, evaluate the average
+    squared error of a local linear regressions on held out data:
+    \begin{enumerate}
+    \item{Find the $k$ nearest neighbors for each day. Randomly split
+      the $k$ nearest neighbors into a 80\%/20\% train/test split, and
+      fit a linear regression model on the training set. Then evaluate
+      the squared error of the linear model on the testing
+      set. Bootstrap and resample the train/test split 5 times, and
+      average the squared error over each train/test
+      resampling.}
+    \item{Average the squared error over each day.}
+    \end{enumerate}
+    Lastly, compare the average squared error on held out data as a function
+    of $k$, and select the $k$ that minimizes the average squared error.
+  \item \textbf{Calculate an evaporation response slope for each day:}
+    Find the $k$ nearest neighbors, where $k$ is determined in the
+    above previous step. For the $k$ nearest neighbors, fit a linear
+    model between initial (dawn) soil moisture and average afternoon
+    evaporation (between 1300-1700). The slope of the linear
+    regression is used as the response of evaporation to a causal
+    intervention on soil moisture ($\frac{\partial E}{\partial SM}$).
+  \item \textbf{Calculate an average causal slope of evaporation
+    response from the daily slopes:} Following
+    Chapter \ref{cha:caus-infer-proc}, we approximate the average
+    effect of changing soil moisture as the average of each of the
+    daily slopes of the regression of afternoon evaporation onto soil
+    moisture, as calculated in the previous step.
+\end{enumerate}
+
+
+\subsection{Site and their characteristics}
+
+We use all sites in the CLASS4GL database with over 500 (daily)
+observations (Figure \ref{fig:map}), leaving 12 sites: Bergen, Idar
+Oberstein, Lindenberg, Milano, Kelowna, Quad City, Spokane, Flagstaff,
+Elko, Las Vegas, Riverton, and Great Falls. Roughly these sites can be
+grouped into two types: more humid/less water limited (Bergen, Idar
+Oberstein, Lindenberg, Milano, Kelowna, and Quad City), and more
+arid/water limited (Spokane, Flagstaff, Elko, Las Vegas, Riverton and
+Great Falls). However, within those groups there is a broader range of
+variability (Figure \ref{fig:site-climate}, and the following
+paragraphs provide context on each site's individual characteristics
+and location.
+
+\begin{figure}
+  \includegraphics[]{./sm-causality-figs/map.pdf}
+  \caption{A map of all sites used in the analysis. These include all
+    of the sites of the CLASS4GL database \cite{wouters-class4gl-2019}
+    which had more than 500 daily observations.  }
+ \label{fig:map}
+\end{figure}
+
+
+\begin{figure}
+  \includegraphics[width=\textwidth]{./sm-causality-figs/site-climate.pdf}
+  \caption{Violin plots of CLASS4GL observations of soil moisture (top
+    panel), relative humidity (middle panel), and cloud cover (bottom
+    panel). Observations are at or near dawn, and serve as
+    initial conditions to the CLASS simulations used in this
+    analysis. The wilting point, which is the threshold of soil
+    moisture below which ecosystems no longer evaporate water, and the
+    field capacity, which is the threshold of soil moisture above
+    which evaporation is no longer reduced or impacted by soil
+    moisture are shown for reference in the top panel.}\label{fig:site-climate}
+\end{figure}
+
+\paragraph{Bergen (Germany; latitude: 52.8153, longitude 9.9247,
+  elevation: 70 m)} Bergen is in northern Germany about halfway
+between Hanover and Hamburg. It has a temperate oceanic climate with
+no dry season \cite[K\"{o}ppen: Cfb,][]{rubel2010}). It has slightly
+elevated relative humidity relative to the other humid sites (Figure
+\ref{fig:site-climate}).
+
+\paragraph{Idar Oberstein (Germany; latitude: 49.6928, longitude:
+  7.3264, elevation: 376 m)} Idar Oberstein is in western Germany,
+about 100 km to the southwest of Frankfurt. It has a temperate oceanic
+climate with no dry season \cite[K\"{o}ppen: Cfb,][]{rubel2010}, and
+aridity characteristics that are relatively similar to the other humid
+sites (Figure \ref{fig:site-climate}).
+
+\paragraph{Lindenberg (Germany; latitude: 52.2167, longitude:
+  14.1167, elevation: 112 m)}
+
+Lindenberg is about 50 km to the southeast of Berlin, Germany. It has
+a temperate oceanic climate with no dry season \cite[(K\"{o}ppen:
+  Cfb)][]{rubel2010}, and aridity characteristics that are relatively
+similar to the other humid sites (Figure \ref{fig:site-climate}).
+
+\paragraph{Milano (Italy; latitude: 45.4614, longitude: 9.2831, elevation: 104 m)}
+
+Milano is a major city in northern Italy. It has a humid subtropical
+climate (K\"{o}ppen: Cfa) with no dry season. There are areas of
+temperature ocean climate K\"{o}ppen: Cfb in the vicinity to the north
+\cite{rubel2010}. The ecosystem is not very water limited: soil
+moisture is above field capacity, which is the threshold of soil
+moisture above which evaporation is no longer reduced or impacted by
+soil moisture. For about 8\% of days in the CLASS4GL data. However,
+relative to the other humid sites, Milano's climate is characterized
+by lower cloud cover (Figure \ref{fig:site-climate}), and a broad
+range of soil moisture values, suggestive of a quasi-Mediterranean
+influence decreasing soil moisture in the summer.
+
+\paragraph{Kelowna (Canada; latitude: 49.9408, longitude: -119.4003,
+  elevation: 456 m)}
+
+Kelowna is located in the interior of south-eastern Canada, about
+300 km northeast of Vancouver. Kelowna has a subarctic climate
+(K\"{o}ppen: Dfc), with warm-summer humid continental climates in the
+vicinity to the northeast (K\"{o}ppen: Dfb)
+\cite[][]{rubel2010}. Relative to the other humid sites, there are
+slightly more clouds at Kelowna and also lower initial relative
+humidity (Figure \ref{fig:site-climate}).
+
+\paragraph{Quad City (United States; latitude: 41.6114, longitude:
+  -90.5817, elevation: 230 m)}
+
+Quad City straddles the Mississippi river on the border of Illinois
+and Iowa, about 230 km west of Chicago in the United States. It has a
+hot summer humid continental climate \cite[K\"{o}ppen:
+  Dfa][]{rubel2010} with no dry season. Quad city is slightly more
+humid and has slightly elevated soil moisture, but has fewer clouds
+than the majority of the other humid sites (Figure \ref{fig:site-climate}).
+
+\paragraph{Spokane (United States; latitude: 47.6806, longitude:
+  -117.6267, elevation: 729 m)}
+
+Spokane is located in the interior of the northwestern United
+States. It has a warm-summer Mediterranean climate (Csb), with a
+temperate oceanic climate (K\"{o}ppen: Cfb) in the vicinity to the NE
+\cite{rubel2010}. This site is slightly arid during the growing
+season: soil moisture is below the wilting point, defined as the
+point at which the ecosystem can no longer sustain evaporation, for
+about 4\% of days in the CLASS4GL data. It is among the more humid of
+the arid sites, although it is characterized by low cloud cover
+(Figure \ref{fig:site-climate}).
+
+\paragraph{Flagstaff (United States; latitude: 35.23, longitude: -111.8217, elevation: 2179 m}
+
+Flagstaff is located in the southeastern United States, on the
+southwestern side of the Colorado Plateau. It has a warm-summer
+Mediterranean climate \cite[K\"{o}ppen: Csb,][]{rubel2010}. Due to
+complex terrain, there are also cold semi-arid climates
+\cite[K\"{o}ppen: BSk,][]{rubel2010} to the southwest, and hot-summer
+Mediterranean climates to the southeast \cite[K\"{o}ppen:
+  Csa,][]{rubel2010}. This site has growing season aridity: about 16\%
+of days are below the wiling point in the CLASS4GL data. Flagstaff is
+among the more humid of the arid sites (Figure \ref{fig:site-climate}).
+
+\paragraph{Elko (United States; latitude: 40.86, longitude: -115.7422,
+  elevation: 1593 m)}
+
+Elko is located in the western interior of the United States, about
+500 km north of Las Vegas. It has a Mediterranean-influenced
+warm-summer humid continental climate (K\"{o}ppen: Dsb), with
+non-Mediterranean warm-summer humid continental climates (K\"{o}ppen:
+Dfb) in the vicinity to the northeast \cite{rubel2010}. This site is
+arid: about 30\% of days are below the wilting point in the CLASS4GL
+data. It is second only to Las Vegas in terms of overall site aridity
+(Figure \ref{fig:site-climate}).
+
+\paragraph{Las Vegas (United States; latitude: 36.05, longitude:
+  -115.1833, elevation: 697 m)}
+
+Las Vegas is located int he southeastern U.S., and has a subtropical
+cold desert climate (K\"{o}ppen: BWk), with hot desert climate in the
+vicinity to the SE (K\"{o}ppen: BWh) \cite{rubel2010}. Fifty-five
+percent of days are below the wilting point in the CLASS4GL
+data. Overall, it is the most arid site in this analysis (Figure
+\ref{fig:site-climate})
+
+\paragraph{Riverton (United States; latitude: 43.0647, longitude:
+  -108.4767, elevation: 1699 m)}
+
+Riverton is located in the Rocky Mountains of the United States. It
+has a cold desert climate (K\"{o}ppen: BWk). However, due to the
+complex terrain other climates exist in close proximity: warm-summer
+humid continental climate (K\"{o}ppen: Dfb) to the southwest, and cold
+semi-arid climates (K\"{o}ppen: BSk) to the northwest and southeast
+\cite{rubel2010}. Twenty-one percent soil moisture observations are
+below the wilting point in the CLASS4GL data. Next to Elko and Las
+Vegas, it is third most arid site in this analysis (Figure
+\ref{fig:site-climate}).
+
+\paragraph{Great Falls (United States; latitude: 47.4614, longitude:
+  -111.3847, elevation: 1132 m)}
+
+Great Falls is located just east of the Rocky Mountains in the
+northern United Dates. Great Falls has a cold semi-arid climate
+(K\"{o}ppen: BSk), but it does receive summer rainfall from isolated
+thunderstorms. Less than 1\% of days are below the wilting point in
+the CLASS4GL data, and it among the most humid of the arid sites
+(Figure \ref{fig:site-climate}).
+
+\section{Results and Discussion}
+
+To reveal the impact of confounding on estimates of the relationship
+between soil moisture and evaporation, we compare naive regressions of
+evaporation onto soil moisture in our two simulated worlds: (1) the
+Realistic World that uses the unaltered CLASS4GL data as forcing for
+the CLASS model, and (2) the Deconfounded World where soil moisture's
+initial condition is sampled independently from all other
+initial/boundary conditions (Section \ref{sec:impact-conf-relat}). We
+also explore the degree to which we can adjust/control for this
+confounding and estimate the causal impact of soil moisture on
+evaporation using passive data from the realistic world (Section
+\ref{sec:adjust-conf-can}).
+
+\subsection{The impact of confounding on relationships between soil moisture and evaporation}
+\label{sec:impact-conf-relat}
+
+\begin{figure}
+  \includegraphics[width=\textwidth]{./sm-causality-figs/reality-deconfounded-comparison.pdf}
+  \caption{A comparison of a naive linear model fit in the Realistic
+    World to a linear model fit in the Deconfounded World. Uncertainty
+    in the ``truth'' (see Section \ref{sec:estim-impact-conf}) is
+    represented by error bars.}
+\label{fig:reality-deconfounded}
+\end{figure}
+
+First, we consider the naive regression of evaporation onto soil
+moisture in the Realistic World. In this world, the effect of soil
+moisture on evaporation is confounded by the underlying climate state
+(Figure \ref{fig:graph}), and the naive regression fit includes bias
+due to both confounding and model specification. For the majority of
+sites, the naive regression results in biased estimates of the average
+effect of soil moisture on evaporation (Figure
+\ref{fig:reality-deconfounded}). However, for some sites (Bergen,
+Idar-Oberstein, Lindenberg, Milano, and Kelowna), all of which are
+among the more humid, even the \textit{sign} of the effect of soil
+moisture on evaporation for the naive linear model is opposite of the
+truth. That is, the naive approach suggests that evaporation increases
+in response to decreasing soil moisture (and increasing
+aridity). While there are possible physical explanations for
+increasing evaporation with increasing soil aridity (for example,
+plants attempting to keep cool in extreme heat\cite{krich2022}), in
+this case, those reasons are incorrect: the ``true''average causal
+effect, as estimated by the model, is positive for all sites (Figure
+\ref{fig:reality-deconfounded}).  For these sites, not accounting for
+confounding results in a completely opposite interpretation to the
+truth.
+
+Because the naive regression in the Realistic World contains model
+specification error in addition to just confounding error, the
+Realistic World's naive regression error needs to be interpreted
+relative to the Deconfounded World, which has no systematic
+confounding error and only model specification error. By comparing
+regressions in the Realistic World and the Deconfounded World, we can
+gain intuition for the magnitude and sign of confounding error, and
+how it varies across sites. If we assume that model specification
+error does not change between the Deconfounded and the Realistic
+World, which may be a reasonable assumption given that the only
+difference between the two worlds are whether soil moisture is sampled
+independently (e.g., all other initial and boundary conditions are
+sampled with the same co-variate structure), then we can assume that
+any difference in regression bias between the Realistic World and the
+Deconfounded World is attributable to confounding. If we make this
+assumption, which we will re-examine later, then we can see that for
+all sites, confounding error biases the estimate of the evaporation
+response to soil moisture towards negative values. This bias towards
+negative values is consistent with confounders that tend to reduce
+soil moisture while enhancing evaporation, or enhance soil moisture
+while reducing evaporation. Cloudiness is one such confounder: if
+climate conditions that lead to a higher probability of cloudiness
+also increase the probability of higher soil moisture, then afternoon
+evaporation on higher soil moisture days will be suppressed due to the
+decrease in radiation from the clouds, and the naive regression of
+evaporation onto soil moisture will be biased towards negative
+values. Vapor pressure deficit or atmospheric aridity is another such
+confounder: if climate conditions that lead to increases in vapor
+pressure deficit (i.e. atmospheric aridity) also increase the
+likelihood of low soil moisture conditions, then on days with low soil
+moisture afternoon evaporative demand will be enhanced by the
+increased vapor pressure deficit, and again, the naive regression will
+be biased towards negative values. These are just examples of physical
+reasoning used to help explain the negative bias of the evaporation
+response to soil moisture due to confounding, but the general point is
+that across all sites confounding contributes a negative bias to the
+naive estimate of evaporation's response to soil moisture. Approaches
+to estimate the effect of soil moisture on evaporation that do not
+adjust for confounding will tend to be biased low relative to the true
+effect.
+
+Overall, the degree to which confounding shifts regression error
+relative to specification error depends on the site. The shift is more
+pronounced for the more humid sites (Bergen, Idar-Oberstein,
+Lindenberg, Milano, Kelowna, and Quad City). For the more arid sites,
+the shift is of a smaller magnitude, and we also observe compensating
+errors where the naive approach in the Deconfounded World
+(specification error) leads to a positive bias, but, as previously
+mentioned, confounding bias shifts the naive approach in the Realistic
+World back towards negative values, placing it within the range of the
+``true'' response (e.g., Elko and Riverton in Figure
+\ref{fig:reality-deconfounded}).
+
+For the more humid sites, and even for some of the more humid of the
+arid sites like Spokane and Great Falls, the confounding error is much
+larger magnitude relative to the model specification error (Figure
+\ref{fig:reality-deconfounded}). This highlights the importance of
+accounting for confounding. Even using a very crude linear model to
+represent a known non-linear process, the confounding errors are
+larger than the model misspecification error. So in some cases,
+\textit{identifying and controlling for sources of confounding is more
+  important than using a sophisticated non-linear regression
+  method}. Of course, ideally we do both: carefully control for
+confounding while using a model that captures the relationships in our
+data well. For interpretability we are using a linear model.
+
+For Flagstaff both the model specification error and confounding error
+are within the range of true values. However for the other arid sites
+of Elko, Las Vegas, and Riverton, the interpretation depends on the
+degree to which model specification bias is the same between the
+Deconfounded and Realistic World. If we believe that specification
+bias is exactly the same in both worlds, then it appears that
+confounding biases compensate model specification errors: model
+specification biases the response positive about the same amount that
+confounding biases the result negative. However, the confounding error
+(relative to specification error) is still less than for the other,
+more humid sites. This matches intuition of the physics: these sites
+(Elko, Las Vegas and Riverton) are situated in arid climates (Figure
+\ref{fig:site-climate}), with initial soil moisture below the modeled
+wilting point on 30\% of days for Elko, 55\% of days for Las Vegas and
+20\% of days for Riverton. When soil moisture is below the wilting
+point evaporation is approximately zero, independent of all other
+variables.  And even when soil moisture is above the wilting point but
+still near it, evaporation will be mostly limited by soil moisture and
+largely decoupled form the other environmental variables that are
+subject to the confounding induced by the underlying climate state. In
+plain words, as ecosystems become more water limited, confounding
+contributes less bias because soil water limitation is the dominant
+determinant of evaporation. In addition to a decrease in confounding
+for arid sites, we could also expect an increase in model
+specification error: the relationship between evaporation and soil
+moisture becomes more nonlinear when ecosystems' soil moisture
+straddles the wilting point (Figure \ref{fig:scatter-example}).
+
+When interpreting Figure \ref{fig:reality-deconfounded} we also need
+to consider the assumption that model specification error is the same
+between both worlds. This is a somewhat reasonable assumption: the
+only difference between the two worlds is whether soil moisture is
+sampled independently from all of the other variables or not. All
+other initial and boundary conditions maintain their same joint
+distribution consistent with the underlying climate. However, this
+slight difference of soil moisture sampling is still a difference, and
+in this case, for the arid sites, the model does appear to fit the
+data less well in the Deconfounded World relative to the Realistic
+World. Specifically, the data are more non-linear in the Deconfounded
+World, and the random error of the model increases more with
+increasing soil moisture (in technical terms, the model is more
+heteroscedasticity in the Deconfounded World) (Figure
+\ref{fig:scatter-example}). Both this increased non-linearity and
+increased heteroscedasticity in the Deconfounded World contribute to a
+more overt violation of the data modeling assumptions of linear regression,
+and likely contribute to a degraded model fit in the Deconfounded
+World relative to the realistic world. The reasons for this shift
+towards increased non-linearity and heteroscedasticity are related to
+the confounding error and how it is suppressed when soil moisture is
+below the wilting point.
+
+We established that confounding bias in this soil moisture-evaporation
+system is due to covariations that enhance soil moisture while
+suppressing evaporation and/or reduce soil moisture while enhancing
+evaporation. This means that the low end of the observed soil moisture
+spectrum are associated with enhanced conditions for evaporation. When
+a site straddles the wilting point (i.e. it is in a strongly water
+stressed regime), in the Realistic World these covariations at the low
+end of the observed soil moisture spectrum exert no influence over
+evaporation; evaporation is independent of the environmental
+conditions.  However, when we shift to the Deconfounded world, those
+enhanced conditions for evaporation are sampled independently from
+soil moisture, so they can occur on days with higher soil moisture
+where they dramatically increase evaporation, increasing the nonlinear
+difference between evaporation when soil moisture is high and when
+soil moisture is at or below the wilting point, and also increasing
+the variance of evaporation when soil moisture is high (Figure
+\ref{fig:scatter-example}). However, these shifts in non-linearity and
+heteroscedasticity between the Realistic and Deconfounded Worlds are
+still relatively subtle (Figure \ref{fig:scatter-example}), even if
+they are more pronounced for the arid sites. A conservative conclusion
+in light of these shifts is that confounding error is more reduced at
+the arid sites relative to the more humid sites, reflecting soil
+moisture's dominance relative to other environmental factors as a
+regulator of evaporation. Additionally, model specification bias of a
+linear model is greater at the more arid sites, reflecting the
+increased nonlinearity of evaporation dependence on soil moisture for
+the more arid sites.
+
+\begin{figure}
+  \includegraphics[width=\textwidth]{sm-causality-figs/scatter-las_vegas.pdf}
+  \caption{An example of naive ordinary least squares regression fits
+    in the Deconfounded World (left panels) and the Realistic World
+    (right panels) for Las Vegas. The only difference between the
+    Realistic World and the Deconfounded World is that soil moisture
+    is sampled independently from the other initial/boundary
+    conditions. However, this difference results in a noticeable
+    difference of the regression fit, particularly for the more arid
+    sites like Las Vegas: in the Deconfounded World the curve is
+    slightly more non-linear, and the error is more strongly a
+    function of soil moisture, particularly at high soil moisture
+    (high heteroscedasticity). This effect is observed most strongly
+    in the arid sites. Figures corresponding to all other sites are
+    available in Appendix \ref{cha:scatter-distributions}.}
+  \label{fig:scatter-example}
+\end{figure}
+
+In summary:
+
+\begin{itemize}
+\item For all of the humid sites and some of the more mild arid sites
+  (Spokane, Great Falls), confounding error is of a larger magnitude
+  than model specification, highlighting the importance of adjusting
+  for confounding.
+\item Confounding error is relatively small for the most arid sites
+  where soil moisture limits evaporation, decoupling evaporation from
+  the other environmental variables.
+\item Linear model specification error increases for the more arid
+  sites, where the relationship becomes more nonlinear as soil
+  moisture approaches and decreases past the wilting point.
+\end{itemize}
+
+\subsection{Adjusting for confounding: can we estimate causal effects?}
+\label{sec:adjust-conf-can}
+
+In Section \ref{sec:impact-conf-relat} we examined the errors
+introduced by confounding through a comparison of two simulated
+worlds: the Realistic World and the Deconfounded World. Here, we
+examine how we might calculate causal effects by adjusting and
+controlling for confounding in passively observed data. All discussion
+in this section will be constrained to the Realistic World (we are
+done with the Deconfoundd World). In the Realistic World, we have
+estimates of the true interventional effect of varying soil moisture,
+so we we can compare the degree to which our estimates of the causal
+effect based on passive (i.e. non-experimental) observations is
+correct. We can also compare our estimate of the causal effect to the
+naive approach where we did not adjust for any sources of confounding.
+
+Following the procedure in Section \ref{sec:attempt-meth-adjust}, we
+obtain causal estimates of the evaporation response to soil moisture
+using a regression of evaporation onto soil moisture for the k-nearest
+neighbors of every day, where neighbor nearness is defined as the
+euclidean distance between normalized normalized soil moisture and the
+confounders (leaf area index, ground temperature, air temperature,
+humidity, cloud cover, wind-speed, boundary layer height (measure of
+wind and stability). In other words, days with similar confounders and
+soil moisture will be neighbors, and we regress evaporation onto soil
+moisture for all the neighboring days to obtain an estimate of the
+response of evaporation to soil moisture. We can average this response
+over all days to obtain an average response of evaporation to soil
+moisture.
+
+\begin{figure}
+  \includegraphics[width=\textwidth]{./sm-causality-figs/reality-adjustment-comparison.pdf}
+  \caption{A comparison between a naive linear model and a model that
+    adjusts for confounding using a k-nearest-neighbors approach
+    (Section \ref{sec:attempt-meth-adjust}). Uncertainty in the
+    ``truth'' (see Section \ref{sec:estim-impact-conf}) is represented
+    by error bars in the top panel. A comparison of errors, defined as
+    deviations outside the possible values of truth, is provided in
+    the bottom panel.  }
+\label{fig:reality-adjustment}
+\end{figure}
+
+Adjusting for confounding reduces error/bias substantially for all
+sites (Figure \ref{fig:reality-adjustment}). Furthermore, even for the
+sites where confounding was a relatively small contributor to bias and
+the naive approach yielded a causal estimate within the range of
+possible values of the true estimate, using the nearest-neighbor
+approach to control for possible confounders did not introduce any new
+bias into the causal estimate. So in this case, even when we include
+variables that may not be strong sources of confounding, we did not
+degrade the quality of our causal estimate. This is important, because
+while in our simulated worlds we know the model's initial and boundary
+conditions so we know the potential sources of confounding, in the
+real world we do not know definitively all the potential sources of
+confounding, even if expert knowledge usually provides a strong
+suggestion of what they may be. When it comes to confounding, it
+appears better to include and adjust for any possible sources of
+confounding rather then leaving them out. However, this is still
+subject to the caveat that while our simulated world includes many of
+the same challenges to causal inference as reality, namely the same
+covariation in initial and boundary conditions as the real world,
+similar nonlinearities, and feedbacks, the two worlds are not the
+same, so there are no guarantees about the degree to which our
+conclusions in this simulated world generalize to the realistic
+world. Also, even if the simulated world were the same as reality,
+each possible causal analysis has different sample sizes and joint
+distributions of variables, so one should still check how their model
+captures the distribution of the data; for example, whether inclusion
+of additional covariates or potential confounders is any different
+than just fitting the statistical model to noise.
+
+While our analysis advocates erring on the side of inclusion for
+potential sources of confounding, it is very important that one does
+not include as a possible source of confounding any variable that
+could be affected by the cause. Fortunately, as we saw in Chapter
+\ref{cha:caus-infer-proc}, it is easy to exclude such variables by
+using the temporal ordering of events: if we never include as
+confounders any variables or observations that happen at a time later
+than our cause, we avoid the possibility of including cause-affected
+variables in our set of confounders. We recommend adjusting for
+confounding and considering all possible sources of confounding in the
+land atmosphere system, as well as following the guidance in Chapter
+\ref{cha:caus-infer-proc}: leverage the temporal ordering of events to
+ensure the confounders are not affected by the cause, and check for
+the potential impact of the unobserved portion of the state space on
+the system.
+
+Our estimates of the causal effect are not always within the range of
+possible values of the truth (see Bergen, Idar-Oberstein, Lindenberg,
+and Milano in Figure \ref{fig:reality-adjustment}), but they are
+close, especially relative to the naive approach. Across site
+variability in the evaporation response is also usually greater than
+the error of the estimate, and our adjustment technique appears to be
+able to differentiate real variability in the causal response of
+evaporation to soil moisture across sites. Our method reproduces the
+pattern of across-site variability, and our data-driven causal effects
+appear useful for studies analyzing and testing hypotheses about how
+average evaporation response to soil moisture varies by climate and
+ecosystem type.
+
+For the causal effects estimated in this simulated reality, we had the
+luxury of interventional experiments for comparison and
+validation. However in the real world we have no such luxury, so we
+recommend that the practitioner applying these methods to the real
+world rigorously ensure that their statistical models capture the
+distribution or expectation of the effect (evaporation) conditional on
+the cause (soil moisture) and all of variables that must be accounted
+for to control for confounding. We wanted to keep the focus on
+confounding rather than building statistical models, but we refer the
+reader to the bounty of excellent resources on how to build
+representative statistical models from data
+\cite{shalizi2013,blei2014,gelman1995bayesian}. If the
+statistical model can accurately represent the expectation of
+evaporation conditional on soil moisture and the confounders, then we
+have confidence through the Equation (\ref{eq:6}) that it can also be
+used to estimate the causal effect of interest.
+
+Relative to a naive approach, statistically adjusting for confounding
+substantially decreases error for most sites, and does not meaningfully
+increase error for any sites. Adjusted causal estimates appear to be
+capable of differentiating true causal responses across sites (climate
+and ecosystem types). We recommend adjusting for confounding wherever
+possible.
+
+\section{Conclusions}
+\label{sec:conclusions}
+
+In summary, we conclude:
+
+  \begin{itemize}
+    \item Confounding bias is largest at the more humid sites, and
+      lower at the more arid sites where soil moisture limits
+      evaporation and decouples the response from other environmental
+      factors (Section \ref{sec:impact-conf-relat}).
+  \item At the more humid sites, bias due to confounding is of a
+    larger magnitude than model specification bias, even when the
+    specified model is a linear model applied to a known non-linear
+    process. This highlights the importance of accounting for
+    confounding. (Section \ref{sec:impact-conf-relat}).
+  \item Statistically adjusting for potential sources of confounding
+    improves causal estimates at the highly confounded sites without
+    degrading causal estimates at arid, soil moisture-limited sites
+    characterized by less confounding bias (Section
+    \ref{sec:adjust-conf-can}). There is less confounding bias at
+    these sites because soil moisture is a key regulator of
+    evaporation in dry conditions.
+
+    \item The estimated causal effects appear to differentiate true
+      variations in the causal effects across climates and
+      ecosystems. (Section \ref{sec:adjust-conf-can}).
+  \end{itemize}
+
+The main point of this paper is that \textbf{confounding can
+  substantially bias causal relationships between variables} in a
+simulated, but realistic, scenario. We must comprehensively consider
+all possible sources of confounding and adjust for them if we want
+to estimate true causal effects reliably across climates and
+ecosystems.
