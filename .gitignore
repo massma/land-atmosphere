@@ -7,3 +7,16 @@ old-data
 figs/*.pdf
 diagnostic_figures
 delta*
+
+*.aug
+*.out
+*.bbl
+*.blg
+*.aux
+*.synctex.gz
+*.lot
+*.lof
+*.log
+*-blx.bib
+*.xml
+*.toc

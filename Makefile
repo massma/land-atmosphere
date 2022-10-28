@@ -8,6 +8,13 @@ NEEDS = figs \
 	figs/simulations.pdf \
 	figs/simulations.png
 
+
+sm-causality.pdf : sm-causality.tex def.tex
+	pdflatex -interaction=nonstopmode sm-causality
+	bibtex sm-causality
+	pdflatex -interaction=nonstopmode sm-causality
+	pdflatex -interaction=nonstopmode sm-causality
+
 all : $(NEEDS)
 
 figs :
